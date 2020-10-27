@@ -1,0 +1,51 @@
+# load the module for cmake
+#module load cmake/3.13.4
+#module load cmake/3.11.3
+#source /gpfs/gpfs_stage1/b6p315aa/setup/setup-mpi.sh
+
+export LDFLAGS=-m64
+export CFLAGS=-m64
+export CXXFLAGS=-m64
+
+module unload cmake 
+module load cmake/3.11.3
+#module load cmake/3.14.2 
+#module load gcc/6.4.0
+module unload gcc
+module load gcc/7.4.0
+module unload cuda
+module load cuda/10.1.243
+module load spectrum-mpi
+# configure
+# /sw/xk6/szip/2.1/
+#
+##-D EXTERNAL_LIBS="/sw/xk6/szip/2.1/cle5.2up02_gnu4.8.2/lib/libsz.a" \
+
+#    -D SILO_DIRECTORY=/sw/xk6/silo/4.8/sles11.1_gnu4.5.3 \
+#    -D HDF5_DIRECTORY=/sw/xk6/hdf5/1.8.7/cle4.1_gnu4.7.2 \
+
+rm -rf CMake*
+cmake                                       \
+    -D CMAKE_BUILD_TYPE:STRING=Release      \
+    -D CMAKE_C_COMPILER:PATH=mpicc          \
+    -D CMAKE_CXX_COMPILER:PATH=mpicxx       \
+    -D CMAKE_C_FLAGS="-std=c++14 -g -m64"                     \
+    -D CMAKE_CXX_FLAGS="-fsigned-char -g -std=c++14 -m64"                   \
+    -D CMAKE_CXX_STANDARD=14                \
+    -D DISABLE_LTO=1 \
+    -D USE_CUDA=1                           \
+        -D CMAKE_CUDA_FLAGS="-arch sm_70 -Xptxas=-v -Xptxas -dlcm=cg -lineinfo"\
+        -D CMAKE_CUDA_HOST_COMPILER="/sw/summit/gcc/7.4.0/bin/gcc"\
+    -D USE_MPI=1                            \
+        -D MPI_COMPILER:BOOL=TRUE           \
+        -D MPIEXEC=mpirun                   \
+        -D USE_EXT_MPI_FOR_SERIAL_TESTS:BOOL=TRUE \
+    -D USE_SILO=1                \
+        -D SILO_DIRECTORY=/gpfs/alpine/eng101/proj-shared/Mark/install/silo \
+        -D HDF5_DIRECTORY=/gpfs/alpine/eng101/proj-shared/Mark/install/hdf5 \
+    -D USE_TIMER=0                          \
+        -D TIMER_DIRECTORY=/gpfs/alpine/eng101/proj-shared/Mark/install/timer \
+    -D USE_DOXYGEN:BOOL=false        \
+    ~/Performance/X303/
+
+make -j8

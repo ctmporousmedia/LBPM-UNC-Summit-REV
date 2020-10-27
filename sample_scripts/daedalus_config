@@ -1,0 +1,29 @@
+# configure
+rm -rf CMake*
+cmake                                    \
+    -D CMAKE_C_COMPILER:PATH=mpicc          \
+    -D CMAKE_CXX_COMPILER:PATH=mpicxx        \
+    -D CMAKE_C_FLAGS="-O3 "         \
+    -D CMAKE_CXX_FLAGS="-O3 -fopenmp -Wno-deprecated-declarations -Wunused-variable"      \
+    -D CXX_STANDARD=14          \
+    -D MPI_COMPILER:BOOL=TRUE            \
+    -D MPIEXEC=mpirun                     \
+    -D USE_EXT_MPI_FOR_SERIAL_TESTS:BOOL=TRUE \
+    -D CMAKE_BUILD_TYPE:STRING=Release     \
+    -D CUDA_FLAGS="-arch sm_35"          \
+    -D CUDA_HOST_COMPILER="/usr/bin/gcc" \
+    -D USE_NETCDF=0                      \
+    -D NETCDF_DIRECTORY="/apps/netcdf"   \
+    -D USE_SILO=1                \
+    -D SILO_DIRECTORY="/home/cpf/silo-4.10.2"         \
+       -D SILO_LIB="/home/cpf/silo-4.10.2/lib/libsiloh5.a"         \
+    -D HDF5_DIRECTORY="/home/cpf/hdf5-1.8.12/hdf5"    \
+       -D HDF5_LIB=/home/cpf/hdf5-1.8.12/hdf5/lib/libhdf5.a \
+       -D HDF5_HL_LIB=/home/cpf/hdf5-1.8.12/hdf5/lib/libhdf5_hl.a \
+    -D USE_ZOLTAN=1 \
+       -D ZOLTAN_DIRECTORY=/home/cpf/Repos/ORB/X303/loadbalance/Zoltan/src \
+       -D ZOLTAN_LIB=/home/cpf/Zoltan_v3.83/build/src/libzoltan.a \
+    -D USE_CUDA=0                        \
+    -D DISABLE_LTO=1   \
+    -D USE_TIMER=0                       \
+    ${HOME}/Repos/LIBB/X303

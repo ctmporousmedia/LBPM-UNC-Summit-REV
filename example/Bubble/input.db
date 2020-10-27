@@ -1,0 +1,51 @@
+Color {
+    tauA   = 1.0;
+    tauB   = 1.0;
+    rhoA   = 1.0;
+    rhoB   = 1.0;
+    alpha = 1e-3;
+    beta  = 0.95;
+    F = 0, 0, 0
+    Restart = false
+    pBC = 0
+    din = 1.0
+    dout = 1.0
+    timestepMax = 500
+    interval = 1000
+    tol = 1e-5;
+    das = 0.1
+    dbs = 0.9
+    flux = 0.0
+    ComponentLabels = -1
+    ComponentAffinity = 0.3
+}
+
+Domain {
+    usr = "cpf"
+    filesystem = 0
+    Filename = "Bubble.raw"
+    nproc = 2,2,2    // Number of processors (Npx,Npy,Npz)
+    n = 110,110,110     // Size of local domain (Nx,Ny,Nz)
+    N = 220,220,220     // size of the input image
+    n_spheres = 1       // Number of spheres
+    L = 1, 1, 1         // Length of domain (x,y,z)
+    BC = 0              // Boundary condition type
+    ReadType = "8bit"
+    ReadValues = -2, -1, 1, 2
+    WriteValues = -2, -1, 1, 2
+}
+
+Analysis {
+    CaThreshold = 1E-5
+    geo_interval = 8
+    blobid_interval = 800000      // Frequency to perform blob identification
+    analysis_interval = 100    // Frequency to perform analysis
+    restart_interval = 5000  // Frequency to write restart data
+    visualization_interval = 50000      // Frequency to write visualization data
+    restart_file = "Restart"    // Filename to use for restart file (will append rank)
+    N_threads    = 7            // Number of threads to use
+    load_balance = "independent" // Load balance method to use: "none", "default", "independent"
+    subdivide = 2,2,2
+}
+
+

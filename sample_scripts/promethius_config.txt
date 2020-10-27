@@ -1,0 +1,24 @@
+# configure
+rm -rf CMake*
+cmake                                    \
+    -D CMAKE_C_COMPILER:PATH=mpicc          \
+    -D CMAKE_CXX_COMPILER:PATH=mpicxx        \
+    -D CMAKE_C_FLAGS="-g "         \
+    -D CMAKE_CXX_FLAGS="-g -Wno-deprecated-declarations -Wunused-variable"      \
+    -D CXX_STANDARD=14 	   \
+    -D MPI_COMPILER:BOOL=TRUE            \
+    -DLIBIGL_DIR=/Users/cpf/libigl \
+    -D MPIEXEC=mpirun                     \
+    -D USE_EXT_MPI_FOR_SERIAL_TESTS:BOOL=TRUE \
+    -D CMAKE_BUILD_TYPE:STRING=Release     \
+    -D USE_NETCDF=0 			 \
+    -D NETCDF_DIRECTORY="/apps/netcdf"	 \
+    -D USE_SILO=1		 \
+       -D SILO_DIRECTORY=/Users/cpf/silo-4.10.2 \
+       -D HDF5_DIRECTORY=/Users/cpf/hdf5-1.8.12 \
+       -D HDF5_LIB=/Users/cpf/hdf5-1.8.12/hdf5/lib/libhdf5.a \
+       -D HDF5_HL_LIB=/Users/cpf/hdf5-1.8.12/hdf5/lib/libhdf5_hl.a \
+    -D USE_CUDA=0                        \
+    -D USE_TIMER=0			 \
+    -D USE_DOXYGEN=0    \
+    ${HOME}/Repos/LBM/master/X303/

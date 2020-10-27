@@ -1,0 +1,47 @@
+
+Color {
+    method = 7  // 1 AA BGK-SBB, 2 AA MRT-SBB, 3 AA MRT-LIBB, 4 AA TRT-SBB, 5 LIBB_TESTING, 6 NON-AA Color MRT-SBB, 7 NON-AA Color MRT-LIBB
+    tauA   = 2.0   // relaxation time for fluid A
+    tauB   = 2.0 // relaxation time for fluid B
+    rhoA   = 1.0     // mass density for fluid A
+    rhoB   = 1.0     // mass density for fluid B
+    alpha = 1e-3     // controls interfacial tension between fluids
+    beta  = 0.95     // controls interface width
+    F = 0, 0, 1E-4      // external body force applied to the system
+    Restart = false   // restart from checkpoint file?
+    din = 1.0         // density at inlet (if external BC is applied)
+    dout = 1.0                 // density at outlet (if external BC is applied )
+    timestepMax = 2000         // maximum number of timesteps to simulate
+    flux = 0.0                 // volumetric flux in voxels per timestep (if flux BC is applied)
+    ComponentLabels = 0        // comma separated list of solid mineral labels 
+    ComponentAffinity = -0.1  //  1 > affinity > -1, excluding 0
+}
+
+Domain {
+    nproc = 1,1,1     // Number of processors (Npx,Npy,Npz)
+    n = 32,32,32    // Size of local domain (Nx,Ny,Nz)
+    N = 32,32,32
+    nspheres = 9   // Number of spheres (only needed if using a sphere packing)
+    L = 1,1,1            // Length of domain (x,y,z)
+    BC = 0                 // Boundary condition type 
+    usr = "cpf"
+    filesystem = 0
+    RandomSaturation = 0.5
+    InitialSaturation = 0
+    ReadValues = 0,1,2
+    WriteValues = 0,1,2
+    legacySDs = true  // oldschool sign distance map
+}
+
+Analysis {
+    blobid_interval = 50000000      // Frequency to perform blob identification
+    analysis_interval = 100    // Frequency to perform analysis
+    restart_interval = 100   // Frequency to write restart data
+    visualization_interval = 100        // Frequency to write visualization data
+    restart_file = "Restart"    // Filename to use for restart file (will append rank)
+    N_threads    = 0            // Number of threads to use
+    load_balance = "none" // Load balance method to use: "none", "default", "independent"
+    subdivide = 1,1,1
+    CaThreshold = 1E-3
+}
+
