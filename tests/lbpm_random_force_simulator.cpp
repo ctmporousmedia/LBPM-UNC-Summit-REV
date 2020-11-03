@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <fstream>
 #include "fnGenerateSphereTest.h"
-#include "fn_lbpm_segmented_pp.h"
+//#include "fn_lbpm_segmented_pp.h"
 #include "fn_lbpm_random_pp.h"
 
 
@@ -60,7 +60,8 @@ int main(int argc, char **argv)
         if (Restart == false) {
             if (FluidInitialization == 1) lbpm_random_pp(argc, argv, rank,nprocs,comm);
             else if (FluidInitialization == 2) lbpm_partial_saturation_pp(argc, argv, rank,nprocs,comm);
-            else lbpm_morphopen_pp(argc,argv,rank,nprocs,comm);
+            else if (FluidInitialization == 3) lbpm_morphdrain_pp(argc,argv,rank,nprocs,comm);
+            else if (FluidInitialization == 4) lbpm_morphopen_pp(argc,argv,rank,nprocs,comm);
         }
         
         
