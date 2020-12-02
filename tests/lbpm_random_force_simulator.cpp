@@ -57,7 +57,7 @@ int main(int argc, char **argv)
         Restart = color_db->getScalar<bool>( "Restart" );
         
         
-        if (Restart == false) {
+       if (Restart == false) {
             if (FluidInitialization == 1) lbpm_random_pp(argc, argv, rank,nprocs,comm);
             else if (FluidInitialization == 2) lbpm_partial_saturation_pp(argc, argv, rank,nprocs,comm);
             else if (FluidInitialization == 3) lbpm_morphdrain_pp(argc,argv,rank,nprocs,comm);

@@ -966,8 +966,9 @@ void lbpm_morphopen_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm
     
     double GlobalNumber = 1.f;
     int imin,jmin,kmin,imax,jmax,kmax;
-    
+
     Rcrit_new = maxdistGlobal;
+    
     //if (argc>2){
     //    Rcrit_new = strtod(argv[2],NULL);
     //    if (rank==0) printf("Max. distance =%f, Initial critical radius = %f \n",maxdistGlobal,Rcrit_new);
@@ -1102,6 +1103,7 @@ void lbpm_morphopen_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm
                 }
             }
         }
+
         MPI_Allreduce(&count,&countGlobal,1,MPI_DOUBLE,MPI_SUM,comm);
         sw_new = countGlobal/totalGlobal;
         sw_diff_new = abs(sw_new-SW);
@@ -1109,6 +1111,7 @@ void lbpm_morphopen_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm
             printf("     %f ",sw_new);
             printf("     %f\n",Rcrit_new);
         }
+        
     }
     
     if (sw_diff_new<sw_diff_old){
@@ -1173,10 +1176,22 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     auto WriteValues = domain_db->getVector<char>( "WriteValues" );
     SW = domain_db->getScalar<double>("RandomSaturation");
     
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///// If desired, can set your own value for Rcrit to avoid the long pp run time caused by the current signed distance map
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if (domain_db->keyExists( "Rcrit" )){
+    	Rcrit_new = domain_db->getScalar<double>("Rcrit");
+    }
+
+    if (rank == 0){
+        printf("Rcrit: %f \n",Rcrit_new);
+    }
+
     if (rank == 0) { printf("\nUsing legacy pre-processor: LBPM_MORPHDRAIN_PP \n");}
-    
+
     if (rank==0)    printf("Target saturation %f \n",SW);
-    
+
     nx = size[0];
     ny = size[1];
     nz = size[2];
@@ -1198,6 +1213,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     ReadID = new char[N];
       
     // Read the signed distance from file
+    //These file names are a little wonky but it does work correctly
     sprintf(LocalRankFilename,"ID.%05i",rank);
     FILE *DIST = fopen(LocalRankFilename,"rb");
     size_t ReadSignDist;
@@ -1216,10 +1232,12 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     DoubleArray phase(nx,ny,nz);
     IntArray phase_label(nx,ny,nz);
     
-  
+    //For extra signed distance map
+    //sprintf(LocalRankFilename,"SignDistA.%05i",rank);
     sprintf(LocalRankFilename,"SignDist.%05i",rank);
     double *SDs; SDs = new double[N];
 
+    //These file names are a little wonky but it does work correctly
     FILE *SDist = fopen(LocalRankFilename,"rb");
     size_t readID=fread(SDs,8,N,SDist);
     if (readID != size_t(N)) printf("lbpm_morphopen_pp: Error reading SDist \n");
@@ -1231,6 +1249,11 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     count = 0.f;
     double maxdist=-200.f;
     double maxdistGlobal;
+    
+    //////////////////////////////////////////////////////
+    //// maxdist is too large, takes forever to run as is
+    //////////////////////////////////////////////////////
+    
     for (int k=1; k<nz-1; k++){
         for (int j=1; j<ny-1; j++){
             for (int i=1; i<nx-1; i++){
@@ -1253,8 +1276,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
                 if ( SignDist(i,j,k) > maxdist) maxdist = SignDist(i,j,k);
             }
         }
-    }
-
+    }    
 
     MPI_Barrier(comm);
     // total Global is the number of nodes in the pore-space
@@ -1263,8 +1285,13 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     double volume=double(nprocx*nprocy*nprocz)*double(nx-2)*double(ny-2)*double(nz-2);
     double porosity=totalGlobal/volume;
     if (rank==0) printf("Media Porosity: %f \n",porosity);
-    if (rank==0) printf("Maximum pore size: %f \n",maxdistGlobal);
-    
+    if (rank==0) {
+        if (Rcrit_new > 0.0){
+            printf("Maximum pore size: %f \n",Rcrit_new);
+        } else {
+            printf("Maximum pore size: %f \n",maxdistGlobal);
+        }
+    }
     Dm->CommInit();
     int iproc = Dm->iproc();
     int jproc = Dm->jproc();
@@ -1340,8 +1367,19 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     
     double GlobalNumber = 1.f;
     int imin,jmin,kmin,imax,jmax,kmax;
+    int count1 = 0;
+
+    double sum_sat_local;
+    double sum_sat;
+    double sum;
+    double sum_local;
     
-    Rcrit_new = maxdistGlobal;
+    if (Rcrit_new <= 0.0){
+        Rcrit_new = maxdistGlobal;
+    }
+    
+    FILE *DRAIN = fopen("morphdrain.csv","w");
+	fprintf(DRAIN,"sw radius\n");	
 
     while (sw_new > SW && Rcrit_new > 0.5)
     {
@@ -1353,9 +1391,9 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
         if (Window == 0) Window = 1; // If Window = 0 at the begining, after the following process will have sw=1.0
         // and sw<Sw will be immediately broken
         double LocalNumber=0.f;
-        for(k=1; k<Nz-1; k++){
-            for(j=1; j<Ny-1; j++){
-                for(i=1; i<Nx-1; i++){
+        for(k=1; k<Nz; k++){
+            for(j=1; j<Ny; j++){
+                for(i=1; i<Nx; i++){
                     n = k*nx*ny + j*nx+i;
                     if (SignDist(i,j,k) > Rcrit_new){
                         // loop over the window and update
@@ -1383,6 +1421,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
                 }
             }
         }
+    
         // Pack and send the updated ID values
         PackID(Dm->sendList_x, Dm->sendCount_x ,sendID_x, ReadID);
         PackID(Dm->sendList_X, Dm->sendCount_X ,sendID_X, ReadID);
@@ -1468,9 +1507,9 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
                     n=k*nx*ny+j*nx+i;
                     if (ReadID[n] == 1){
                         phase(i,j,k) = 1.0;
-                    }
-                    else
+                    } else {
                         phase(i,j,k) = -1.0;
+                    }
                 }
             }
         }
@@ -1485,14 +1524,23 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
             for (int j=0; j<ny; j++){
                 for (int i=0; i<nx; i++){
                     n=k*nx*ny+j*nx+i;
-                    if (ReadID[n] == 1 && phase_label(i,j,k) > 1){
+                    if (ReadID[n] == 1 && phase_label(i,j,k) > 0){
                         ReadID[n] = 2;
                     }
                 }
             }
         }
 
-        count = 0.f;
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //Number of n blobs at this point should be equal to one, can add in the "phase" for loop from above and the computeglobalblobids to check,
+        //this outputs as one with the current blob analysis, but based on the visualization may not be accurate
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+        //Switch out this saturation calculation to something more accurate (below)
+
+
+       /* count = 0.f;
         for (int k=1; k<Nz-1; k++){
             for (int j=1; j<Ny-1; j++){
                 for (int i=1; i<Nx-1; i++){
@@ -1502,14 +1550,69 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
                     }
                 }
             }
+        }*/
+
+
+//////////////////////////////////////////////////////////////////////////////
+
+        //sum_sat_local=0.0;
+
+        /*count = 0.f;
+        for (int k=1; k<Nz-1; k++){
+            for (int j=1; j<Ny-1; j++){
+                for (int i=1; i<Nx-1; i++){
+                    n=k*Nx*Ny+j*Nx+i;
+                    if (ReadID[n] == 1){
+                        sum_sat_local+=1.0;
+                    }
+                }
+            }
         }
-        MPI_Allreduce(&count,&countGlobal,1,MPI_DOUBLE,MPI_SUM,comm);
-        sw_new = countGlobal/totalGlobal;
+        MPI_Allreduce(&sum_sat_local,&sum_sat,1,MPI_DOUBLE,MPI_SUM,comm);*/
+        
+
+        
+
+        //use this saturation calculation to match timelog.tcat output better than the one above
+
+
+        sum_sat_local = 0.0;
+        sum_sat = 0.0;
+        sum_local = 0.0;
+        sum = 0.0;
+    
+        const int cube[8][3] = {{0,0,0},{1,0,0},{0,1,0},{1,1,0},{0,0,1},{1,0,1},{0,1,1},{1,1,1}};
+        
+        for (int k=1;k<Nz-1;k++){
+            for (int j=1;j<Ny-1;j++){
+                for (int i=1;i<Nx-1;i++){
+                    for (int p=0; p<8; p++) {
+                        int n = i+cube[p][0] + (j+cube[p][1])*Nx + (k+cube[p][2])*Nx*Ny;
+                        if (ReadID[n] > 0 ){ sum_local+=0.125; }
+                        if (ReadID[n] == 1) { sum_sat_local+=0.125; }
+                        
+                    }
+                }
+            }
+        }
+
+        MPI_Allreduce(&sum_local,&sum,1,MPI_DOUBLE,MPI_SUM,comm);
+        MPI_Allreduce(&sum_sat_local,&sum_sat,1,MPI_DOUBLE,MPI_SUM,comm);
+        sw_new = 1.-sum_sat/sum;
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+        //MPI_Allreduce(&count,&countGlobal,1,MPI_DOUBLE,MPI_SUM,comm);
+        //sw_new = countGlobal/totalGlobal;
+
         sw_diff_new = abs(sw_new-SW);
         if (rank==0){
+            fprintf(DRAIN,"%f ",sw_new);
+			fprintf(DRAIN,"%f\n",Rcrit_new);
             printf("     %f ",sw_new);
             printf("     %f\n",Rcrit_new);
         }
+
     }
     
     if (sw_diff_new<sw_diff_old){

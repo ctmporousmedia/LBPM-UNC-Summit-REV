@@ -656,15 +656,19 @@ void ReadSpherePacking(int nspheres,
     // .............................................................
 }
 
+//void ComputeLIBBqDistances_sp(char * LIBB_id,
+//                              double * qDistances, double * signedDistance, double * signedDistance2, double * signedDistance2A, int & Nx, int & Ny, int & Nz, double & Lx, int & nspheres, int iproc, int jproc, int kproc, int nprocx, int nprocy, int nprocz, int rank, Domain &Dm) {
+
 void ComputeLIBBqDistances_sp(char * LIBB_id,
                               double * qDistances, double * signedDistance, double * signedDistance2, int & Nx, int & Ny, int & Nz, double & Lx, int & nspheres, int iproc, int jproc, int kproc, int nprocx, int nprocy, int nprocz, int rank, Domain &Dm) {
+        
     
-    
-    
+    int N = Nx*Ny*Nz;
+
     size_t m;
     size_t count = 0;
     size_t c = 0;
-    
+
     double volume = double((Nx-2)*(Ny-2)*(Nz-2)*nprocx*nprocy*nprocz);
     
     RayTrace rt;
@@ -672,17 +676,17 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
     double * ray_origin;     ray_origin = new double[3];
     double * ray_direction;  ray_direction = new double[3];
     double sphere_radius;
-    
+
+
     size_t cross_count = 0;
     double *ccx,*ccy,*ccz,*r;
     ccx = new double[nspheres];
     ccy = new double[nspheres];
     ccz = new double[nspheres];
     r = new double[nspheres];
-    ReadSpherePacking(nspheres,
-                      ccx,ccy,ccz,r);
+    ReadSpherePacking(nspheres,ccx,ccy,ccz,r);
     double cx,cy,cz,rad;
-    
+
     /* Parallel registers */
     int imin,imax,jmin,jmax,kmin,kmax;
     double min_x,min_y,min_z;
@@ -698,7 +702,7 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
     double sr = r[0];
     // if (rank == 0) cout << "All sphere radii are " << sr << " lattice units" << endl;
     
-    double analytical_porosity = (1.0-double(2)* (4./3.*3.14159265359 * sr*sr*sr))/1.0;
+    //double analytical_porosity = (Lx*Lx*Lx-double(nspheres)* (4./3.*3.14159265359 * sr*sr*sr))/(Lx*Lx*Lx);
     // if (rank == 0) printf("Analytical porosity=%.15f (valid for equally sized spheres)\n",analytical_porosity);
     //............................................
     // Get maximum and minimum for this domain
@@ -775,7 +779,7 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
     int rank_size = nprocx*nprocy*nprocz;
     int * rankArray; rankArray = new int[rank_size];
     for (int i = 0; i < rank_size; i++) rankArray[i] = 0;
-    
+
     vector<int> whichSphere;
     
     // my rank
@@ -821,12 +825,9 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
         }
     } // n spheres loop
     
-    
-
     MPI_Barrier(Dm.Comm);
     MPI_Allreduce(MPI_IN_PLACE, rankArray, rank_size, MPI_INT, MPI_SUM, Dm.Comm);
     MPI_Barrier(Dm.Comm);
-    
     
 //    int max = rankArray[0];
 //    
@@ -834,11 +835,11 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
 //    if (arr[ii] > max) {
 //        max = arr[ii];
 //    }}
-    
     // Allocate SignedDistance field with multiple levels given the number of spheres in each rank
+    //int mult = rankArray[myRank]*Nx*Ny*Nz;
     double * RankRayTraceDistance; RankRayTraceDistance = new double[rankArray[myRank]*Nx*Ny*Nz];
     for (int i = 0; i < rankArray[myRank]*Nx*Ny*Nz; i++) RankRayTraceDistance[i] = 1000;
-    
+    //for (int i = 0; i < mult; i++) RankRayTraceDistance[i] = 1000;
     for (int s=0; s < whichSphere.size(); s++) {
         int p = whichSphere.at(s);
         
@@ -870,11 +871,7 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
             }
         }
         
-        
-        
     }
-    
-    
        
     char LocalRankString[8]; sprintf(LocalRankString,"%05d",rank);
     char LocalRankFilename1[40];
@@ -884,7 +881,6 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
     if (RTFILE==NULL) ERROR("Error opening file: rankRT.xxxxx");
     fwrite(RankRayTraceDistance,8,(Nx*Ny*Nz)*whichSphere.size(),RTFILE);
     fclose(RTFILE);
-    
     
     if (rank == 0) {
         char LocalRankString[8]; sprintf(LocalRankString,"%05d",rank);
@@ -923,22 +919,79 @@ void ComputeLIBBqDistances_sp(char * LIBB_id,
         sphere_center[0] = cx/hx+0.5+0.5; // Extra 0.5 needed for tri mesh symmetry with the porous medium
         sphere_center[1] = cy/hx+0.5+0.5;
         sphere_center[2] = cz/hx+0.5+0.5;
-        sphere_radius = rad/hx;
+
         for (int i=1;i<Nx-1;i++){
             for (int j=1;j<Ny-1;j++){
                 for (int k=1;k<Nz-1;k++){
                     m = k*Nx*Ny+j*Nx+i;
-                    double dist = sqrt( (double(i)-sphere_center[0])*(double(i)-sphere_center[0]) + (double(j)-sphere_center[1])*(double(j)-sphere_center[1]) + (double(k)-sphere_center[2])*(double(k)-sphere_center[2]) ) - sphere_radius ;
+                    double dist = sqrt( (double(i)-sphere_center[0])*(double(i)-sphere_center[0]) + (double(j)-sphere_center[1])*(double(j)-sphere_center[1]) + (double(k)-sphere_center[2])*(double(k)-sphere_center[2]) ) - sphere_radius;
                     if (dist < signedDistance2[m]) signedDistance2[m] = dist;
                 }
             }
         }
     } // n spheres loop
     
-    
-    
-    
-    
+       
+    // For extra signed distance map
+    /*for (int p=0;p<nspheres;p++) {
+        // Get the sphere from the list, map to local min
+        cx = ccx[p] - min_x;
+        cy = ccy[p] - min_y;
+        cz = ccz[p] - min_z;
+        rad = r[p];
+        
+
+        sphere_center[0] = cx/hx+0.5; // Extra 0.5 needed for tri mesh symmetry with the porous medium
+        sphere_center[1] = cy/hx+0.5;
+        sphere_center[2] = cz/hx+0.5;
+        sphere_radius = rad/hx;
+
+		imin = int ((cx-2*rad)/hx);
+		imax = int ((cx+2*rad)/hx)+2;
+		jmin = int ((cy-2*rad)/hx);
+		jmax = int ((cy+2*rad)/hx)+2;
+		kmin = int ((cz-2*rad)/hx);
+		kmax = int ((cz+2*rad)/hx)+2;
+
+		// Obviously we have to do something at the edges
+		if (imin<0)     imin = 0;
+		if (imin>Nx)    imin = Nx;
+		if (imax<0)     imax = 0;
+		if (imax>Nx)    imax = Nx;
+		if (jmin<0)     jmin = 0;
+		if (jmin>Ny)    jmin = Ny;
+		if (jmax<0)     jmax = 0;
+		if (jmax>Ny)    jmax = Ny;
+		if (kmin<0)     kmin = 0;
+		if (kmin>Nz)    kmin = Nz;
+		if (kmax<0)     kmax = 0;
+		if (kmax>Nz)    kmax = Nz;
+
+
+		for (int i=imin;i<imax;i++){
+			for (int j=jmin;j<jmax;j++){
+				for (int k=kmin;k<kmax;k++){
+                    m = k*Nx*Ny+j*Nx+i;
+                    double dist = sqrt( (double(i)-sphere_center[0])*(double(i)-sphere_center[0]) + (double(j)-sphere_center[1])*(double(j)-sphere_center[1]) + (double(k)-sphere_center[2])*(double(k)-sphere_center[2]) ) - sphere_radius;
+                    if (dist < signedDistance2A[m]) signedDistance2A[m] = dist;
+                }
+            }
+        }
+    } */
+    // n spheres loop
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     // .........Loop over the spheres.............
     for (int p=0;p<nspheres;p++){
