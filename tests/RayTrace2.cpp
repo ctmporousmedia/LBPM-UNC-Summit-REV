@@ -500,209 +500,222 @@ int main(int argc, char **argv)
         
         auto rt_db = db->getDatabase( "RayTrace" );
         int geometry = rt_db->getScalar<int>( "geometry" );
+        
+        double upperplate = rt_db->getScalar<int>( "upperplate" );
+        double lowerplate = rt_db->getScalar<int>( "lowerplate" );
         double offset = rt_db->getScalar<double>( "offset" );
         
-
-        // For extra signed distance map
-        //int FluidInitialization = 0;
-        //if (color_db->keyExists( "FluidInitialization" )){
-    	//    FluidInitialization = color_db->getScalar<int>("FluidInitialization");
-        //}
-
-
-
-
         if (Restart == false ) {
         
-            if (rank == 0) { cout << "Geometry:";
-                if (geometry == 1 ) cout << "periodic sphere pack";
-                if (geometry == 2 ) cout << "slab" << endl << endl;
-                if (geometry == 3 ) cout << "parallel plates";
-                if (geometry == 4 ) cout << "square tube" << endl << endl;
-                if (geometry == 5 ) cout << "capillary tube" << endl << endl;
-                /* Parameters for particular methods */
-                if (geometry == 1 ) cout << " with " << nspheres << " spheres" << endl << endl;
-                if (geometry == 3 ) cout << " with offset=" << offset << endl << endl;
-            }
-            
-            /* Set up domain sizes with halo */
-            size_t Nq = 18;
-            Nx += 2;
-            Nx = Ny = Nz;
-            size_t N = Nx*Ny*Nz;
-            
-            
-            size_t NqN = Nq*N;
-            
-            /* Initialize domain class communication */
-            for (n=0; n<N; n++) Dm->id[n] = 1;  Dm->CommInit();  for (n=0; n<N; n++) Dm->id[n] = 2; // Set wetting phase (id=2)
-            
-            /* Declare ray tracing data arrays */
-            auto boolfield = new bool[N];  for (n=0; n<N; n++) boolfield[n]=true; fillBoolfield(boolfield, Nx, Ny, Nz);
-            
-            /* Initialize ray-trace data */
-            char* LIBB_id;  LIBB_id = new char[N];  for (size_t n=0; n<N; n++) LIBB_id[n] = 2; // Set domain to wetting fluid
-            double*  qList;   qList = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList[n] = -1;
-            double* rtDistance; rtDistance = new double[N];  for (size_t n = 0; n < N; n++) rtDistance[n] = 1000.0;
-            double* SDs; SDs = new double[N];  for (size_t n = 0; n < N; n++) SDs[n] = 1000.0;
-            // For extra signed distance map
-            //double* SDsA; SDsA = new double[N];  for (size_t n = 0; n < N; n++) SDsA[n] = 1000.0;
-            
-            
-            /* Initialize ray-trace data */
-            double* LIBB_id1;  LIBB_id1 = new double[N];  for (size_t n=0; n<N; n++) LIBB_id1[n] = 2.0; // Set domain to wetting fluid
-            double*  qList1;   qList1 = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList1[n] = -1;
-            double* rtDistance1; rtDistance1 = new double[N];  for (size_t n = 0; n < N; n++) rtDistance1[n] = 1000.0;
-            double* SDs1; SDs1 = new double[N];  for (size_t n = 0; n < N; n++) SDs1[n] = 1000.0;
-            
-            
-            
-            double* LIBB_id2;  LIBB_id2 = new double[N];  for (size_t n=0; n<N; n++) LIBB_id2[n] = 1000.0; // Set domain to wetting fluid
-            double*  qList2;   qList2 = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList2[n] = -1;
-            double* rtDistance2; rtDistance2 = new double[N];  for (size_t n = 0; n < N; n++) rtDistance2[n] = 1000.0;
-            double* SDs2; SDs2 = new double[N];  for (size_t n = 0; n < N; n++) SDs2[n] = 1000.0;
-                
+        if (rank == 0) { cout << "Geometry:";
+            if (geometry == 1 ) cout << "periodic sphere pack";
+            if (geometry == 2 ) cout << "slab" << endl << endl;
+            if (geometry == 3 ) cout << "parallel plates";
+            if (geometry == 4 ) cout << "square tube" << endl << endl;
+            if (geometry == 5 ) cout << "capillary tube" << endl << endl;
+            /* Parameters for particular methods */
+            if (geometry == 1 ) cout << " with " << nspheres << " spheres" << endl << endl;
+            if (geometry == 3 ) cout << " with offset=" << offset << endl << endl;
+        }
         
-                
+        /* Set up domain sizes with halo */
+        size_t Nq = 18;
+        Nx += 2;
+        Nx = Ny = Nz;
+        size_t N = Nx*Ny*Nz;
+        
+        
+        size_t NqN = Nq*N;
+        
+        /* Initialize domain class communication */
+        for (n=0; n<N; n++) Dm->id[n] = 1;  Dm->CommInit();  for (n=0; n<N; n++) Dm->id[n] = 2; // Set wetting phase (id=2)
+        
+        /* Declare ray tracing data arrays */
+        auto boolfield = new bool[N];  for (n=0; n<N; n++) boolfield[n]=true; fillBoolfield(boolfield, Nx, Ny, Nz);
+        
+        /* Initialize ray-trace data */
+        char* LIBB_id;  LIBB_id = new char[N];  for (size_t n=0; n<N; n++) LIBB_id[n] = 2; // Set domain to wetting fluid
+        double*  qList;   qList = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList[n] = -1;
+        double* rtDistance; rtDistance = new double[N];  for (size_t n = 0; n < N; n++) rtDistance[n] = 1000.0;
+        double* SDs; SDs = new double[N];  for (size_t n = 0; n < N; n++) SDs[n] = 1000.0;
+        
+        
+        
+        /* Initialize ray-trace data */
+        double* LIBB_id1;  LIBB_id1 = new double[N];  for (size_t n=0; n<N; n++) LIBB_id1[n] = 2.0; // Set domain to wetting fluid
+        double*  qList1;   qList1 = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList1[n] = -1;
+        double* rtDistance1; rtDistance1 = new double[N];  for (size_t n = 0; n < N; n++) rtDistance1[n] = 1000.0;
+        double* SDs1; SDs1 = new double[N];  for (size_t n = 0; n < N; n++) SDs1[n] = 1000.0;
+        
+        
+        
+        double* LIBB_id2;  LIBB_id2 = new double[N];  for (size_t n=0; n<N; n++) LIBB_id2[n] = 1000.0; // Set domain to wetting fluid
+       double*  qList2;   qList2 = new double[NqN]; for (size_t n = 0; n < NqN; n++) qList2[n] = -1;
+       double* rtDistance2; rtDistance2 = new double[N];  for (size_t n = 0; n < N; n++) rtDistance2[n] = 1000.0;
+       double* SDs2; SDs2 = new double[N];  for (size_t n = 0; n < N; n++) SDs2[n] = 1000.0;
             
-            // Sphere pack
-            if (Berea == false && geometry == 1) {
-
-                /* Compute q array, ray-trace distance array, and id (domain) */
-
-                //For extra signed distance map
-                //ComputeLIBBqDistances_sp(LIBB_id, qList, rtDistance, SDs, SDsA, Nx, Ny, Nz, Lx, nspheres, iproc,  jproc,
-                //                        kproc,  nprocx,  nprocy,  nprocz, rank, *Dm);
-
-                ComputeLIBBqDistances_sp(LIBB_id, qList, rtDistance, SDs, Nx, Ny, Nz, Lx, nspheres, iproc,  jproc,
-                                        kproc,  nprocx,  nprocy,  nprocz, rank, *Dm);
-
-            // for (int i = 0; i < N; i++) { if (rtDistance[i] < 0.5) { LIBB_id[i] = 0; } else { LIBB_id[i] = 2; } }
-            }
-
-            
-            if ( Berea == false && geometry == 2 ) {
-                double A,B,C,D;
-                A = 0;  B = 0;  C = 1;  D = 16+offset;
-                ComputeSlabQDistances(qList1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeIDarray(LIBB_id1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeRayTracedDistance(rtDistance1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeMeshDistance(SDs1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                
-                for (size_t n=0; n<N; n++) LIBB_id[n] = LIBB_id1[n];
-                for (size_t n = 0; n < NqN; n++) qList[n] = qList1[n];
-                for (size_t n = 0; n < N; n++) rtDistance[n] = rtDistance1[n];
-                for (size_t n = 0; n < N; n++) SDs[n] = SDs1[n];
-            }
+    
             
         
-            
-            if ( Berea == false && geometry == 3 ) {
-                double A,B,C,D;
-                A = 0;  B = 0;  C = 1;  D = 12+offset;
-                
-                // The offset conditional below is used to make sure that the porosities are
-                // equivalent between offset and non-offset version.  Could have
-                // gone the other way and subtracted 1 to offset!=0 case...
-                if (offset == 0.0) D +=1;
-                
-                ComputeSlabQDistances(qList1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeIDarray(LIBB_id1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeRayTracedDistance(rtDistance1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeMeshDistance(SDs1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                
-                A = 0;  B = 0;  C = -1;  D = 20+offset;
-                ComputeSlabQDistances(qList2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeIDarray(LIBB_id2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeRayTracedDistance(rtDistance2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-                ComputeMeshDistance(SDs2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
-            
-                MergeSlabQDistances(qList,qList1,qList2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
-                MergeIDarray(LIBB_id,LIBB_id1,LIBB_id2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
-                MergeRayTracedDistance(rtDistance,rtDistance1,rtDistance2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
-                MergeMeshDistance(SDs,SDs1,SDs2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
-            }
-            
-                
-            if (Berea == false) {
-                PopulateHalo_Char(LIBB_id, *Dm, Nx, Ny, Nz, rank);
-                PopulateHalo_Double(rtDistance, *Dm, Nx, Ny, Nz, rank);
-                PopulateHalo_Double(SDs, *Dm, Nx, Ny, Nz, rank);
-                PopulateHalo_Double(SDsA, *Dm, Nx, Ny, Nz, rank);
-                
-                MPI_Barrier(comm);
-                
-                /* Check the porosity */
-                double porosity = calculate_porosity(LIBB_id, Nx, Ny, Nz, *Dm, rank);
-                if (rank == 0) cout << "Actual id porosity=" << porosity << endl;
-                
-                MPI_Barrier(comm);
-                
-                sprintf(LocalRankFilename1,"%s%s","RTD.",LocalRankString);
-                FILE *RTFILE = fopen(LocalRankFilename1,"wb");
-                if (RTFILE==NULL) ERROR("Error opening file: rt.xxxxx");
-                fwrite(rtDistance,8,N,RTFILE);
-                fclose(RTFILE);
-                
-                MPI_Barrier(comm);
-                
-                sprintf(LocalRankFilename2,"%s%s","ID.",LocalRankString);
-                FILE *IDFILE = fopen(LocalRankFilename2,"wb");
-                if (IDFILE==NULL) ERROR("Error opening file: ID.xxxxx");
-                fwrite(LIBB_id,1,N,IDFILE);
-                fclose(IDFILE);
-                
-                MPI_Barrier(comm);
-                
-                sprintf(LocalRankFilename3,"%s%s","q.",LocalRankString);
-                FILE *QFILE = fopen(LocalRankFilename3,"wb");
-                if (QFILE==NULL) ERROR("Error opening file: q.xxxxx");
-                fwrite(qList,8,NqN,QFILE);
-                fclose(QFILE);
-                
-                MPI_Barrier(comm);
-                
-                sprintf(LocalRankFilename4,"%s%s","SignDist.",LocalRankString);
-                FILE *SDFILE = fopen(LocalRankFilename4,"wb");
-                if (SDFILE==NULL) ERROR("Error opening file: sd.xxxxx");
-                fwrite(SDs,8,N,SDFILE);
-                fclose(SDFILE);
+        // Sphere pack
+        if (Berea == false && geometry == 1) {
 
-                //For extra signed distance map
-                /*if (FluidInitialization == 3){
-                    MPI_Barrier(comm);
-                    
-                    sprintf(LocalRankFilename4,"%s%s","SignDistA.",LocalRankString);
-                    FILE *SDAFILE = fopen(LocalRankFilename4,"wb");
-                    if (SDAFILE==NULL) ERROR("Error opening file: sdA.xxxxx");
-                    fwrite(SDsA,8,N,SDAFILE);
-                    fclose(SDAFILE);
-                }*/
-                    
-            }
-        
-            /* Clean up memory */
-            delete[] LIBB_id1;
-            delete[] qList1;
-            delete[] rtDistance1;
-            
-            delete[] LIBB_id2;
-            delete[] qList2;
-            delete[] rtDistance2;
-        
-            delete[] LIBB_id;
-            delete[] qList;
-            delete[] rtDistance;
-            delete[] SDs;
+            /* Compute q array, ray-trace distance array, and id (domain) */
+            ComputeLIBBqDistances_sp(LIBB_id, qList, rtDistance, SDs,  Nx, Ny, Nz, Lx, nspheres, iproc,  jproc,
+                                     kproc,  nprocx,  nprocy,  nprocz, rank, *Dm);
+           // for (int i = 0; i < N; i++) { if (rtDistance[i] < 0.5) { LIBB_id[i] = 0; } else { LIBB_id[i] = 2; } }
+        }
 
-            //For extra signed distance map
-            //delete[] SDsA;
+        
+        if ( Berea == false && geometry == 2 ) {
+            double A,B,C,D;
+            A = 0;  B = 0;  C = 1;  D = 16+offset;
+            ComputeSlabQDistances(qList1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeIDarray(LIBB_id1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeRayTracedDistance(rtDistance1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeMeshDistance(SDs1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            
+            for (size_t n=0; n<N; n++) LIBB_id[n] = LIBB_id1[n];
+            for (size_t n = 0; n < NqN; n++) qList[n] = qList1[n];
+            for (size_t n = 0; n < N; n++) rtDistance[n] = rtDistance1[n];
+            for (size_t n = 0; n < N; n++) SDs[n] = SDs1[n];
+        }
+        
+       
+        
+        if ( Berea == false && geometry == 3 ) {
+            double A,B,C,D;
+            A = 0;  B = 1;  C = 0;  D = lowerplate+offset;
+            
+            // The offset conditional below is used to make sure that the porosities are
+            // equivalent between offset and non-offset version.  Could have
+            // gone the other way and subtracted 1 to offset!=0 case...
+            if (offset == 0.0) D +=1;
+            
+            ComputeSlabQDistances(qList1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeIDarray(LIBB_id1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeRayTracedDistance(rtDistance1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeMeshDistance(SDs1, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            
+            A = 0;  B = -1;  C = 0;  D = upperplate-offset;
+            ComputeSlabQDistances(qList2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeIDarray(LIBB_id2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeRayTracedDistance(rtDistance2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+            ComputeMeshDistance(SDs2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank, A,B,C,D, offset);
+        
+            MergeSlabQDistances(qList,qList1,qList2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
+            MergeIDarray(LIBB_id,LIBB_id1,LIBB_id2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
+            MergeRayTracedDistance(rtDistance,rtDistance1,rtDistance2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
+            MergeMeshDistance(SDs,SDs1,SDs2, Nx, Ny, Nz, Lx, iproc,  jproc, kproc,  nprocx,  nprocy,  nprocz, rank);
+            
+            /* Pseudo stuff for rankArray */
+            int rank_size = nprocx*nprocy*nprocz;
+            int * rankArray; rankArray = new int[rank_size];
+            for (int i = 0; i < rank_size; i++) rankArray[i] = 1;
             
             if (rank == 0) {
-                cout << "End of ray tracing pre-processor. " << endl;
-            } else {
-                if (rank == 0) cout << "Restarting...skipping RayTrace pre-processing." << endl;
+                char LocalRankString[8]; sprintf(LocalRankString,"%05d",rank);
+                char LocalRankFilename1[40];
+                
+                // how many spheres on a rank
+                sprintf(LocalRankFilename1,"%s%s","NSpheresPerRankArray.",LocalRankString);
+                FILE *NSPRA = fopen(LocalRankFilename1,"wb");
+                if (NSPRA==NULL) ERROR("Error opening file: NSPRA.xxxxx");
+                fwrite(rankArray,4,rank_size,NSPRA);
+                fclose(NSPRA);
             }
+            delete[] rankArray;
+            
+            double * RankRayTraceDistance; RankRayTraceDistance = new double[Nx*Ny*Nz];
+            for (size_t n = 0; n < N; n++) RankRayTraceDistance[n] = rtDistance[n];
+            
+            sprintf(LocalRankFilename1,"%s%s","RankRTD.",LocalRankString);
+            FILE *RTFILE = fopen(LocalRankFilename1,"wb");
+            if (RTFILE==NULL) ERROR("Error opening file: rankRT.xxxxx");
+            fwrite(RankRayTraceDistance,8,(Nx*Ny*Nz),RTFILE);
+            fclose(RTFILE);
+            delete[] RankRayTraceDistance;
+            
+            
+            
+        }
+        
+            
+            if (Berea == false) {
+        PopulateHalo_Char(LIBB_id, *Dm, Nx, Ny, Nz, rank);
+        PopulateHalo_Double(rtDistance, *Dm, Nx, Ny, Nz, rank);
+        PopulateHalo_Double(SDs, *Dm, Nx, Ny, Nz, rank);
+        
+        
+        MPI_Barrier(comm);
+
+        for (int k=0; k<Nz; k++){
+            for (int j=0; j<Ny; j++){
+                for (int i=0; i<Nx; i++){
+                    int nsds = k*Nx*Ny+j*Nx+i;
+                    if ( SDs[nsds] == 1000.0){
+                        printf("\n SDS is 1000.0 at n = %i or i,j,k = %i,%i,%i \n",nsds,i,j,k);
+                    }
+                }
+            }
+        }
+
+        
+        /* Check the porosity */
+        double porosity = calculate_porosity(LIBB_id, Nx, Ny, Nz, *Dm, rank);
+        if (rank == 0) cout << "Actual id porosity=" << porosity << endl;
+        
+        MPI_Barrier(comm);
+        
+        sprintf(LocalRankFilename1,"%s%s","RTD.",LocalRankString);
+        FILE *RTFILE = fopen(LocalRankFilename1,"wb");
+        if (RTFILE==NULL) ERROR("Error opening file: rt.xxxxx");
+        fwrite(rtDistance,8,N,RTFILE);
+        fclose(RTFILE);
+        
+        MPI_Barrier(comm);
+        
+        sprintf(LocalRankFilename2,"%s%s","ID.",LocalRankString);
+        FILE *IDFILE = fopen(LocalRankFilename2,"wb");
+        if (IDFILE==NULL) ERROR("Error opening file: ID.xxxxx");
+        fwrite(LIBB_id,1,N,IDFILE);
+        fclose(IDFILE);
+        
+        MPI_Barrier(comm);
+        
+        sprintf(LocalRankFilename3,"%s%s","q.",LocalRankString);
+        FILE *QFILE = fopen(LocalRankFilename3,"wb");
+        if (QFILE==NULL) ERROR("Error opening file: q.xxxxx");
+        fwrite(qList,8,NqN,QFILE);
+        fclose(QFILE);
+        
+        MPI_Barrier(comm);
+        
+        sprintf(LocalRankFilename4,"%s%s","SignDist.",LocalRankString);
+        FILE *SDFILE = fopen(LocalRankFilename4,"wb");
+        if (SDFILE==NULL) ERROR("Error opening file: sd.xxxxx");
+        fwrite(SDs,8,N,SDFILE);
+        fclose(SDFILE);
+                
+            }
+    
+        /* Clean up memory */
+        delete[] LIBB_id1;
+        delete[] qList1;
+        delete[] rtDistance1;
+        
+        delete[] LIBB_id2;
+        delete[] qList2;
+        delete[] rtDistance2;
+    
+        delete[] LIBB_id;
+        delete[] qList;
+        delete[] rtDistance;
+        delete[] SDs;
+        if (rank == 0) cout << "End of ray tracing pre-processor. " << endl;
+        }
+        else {
+            if (rank == 0) cout << "Restarting...skipping RayTrace pre-processing." << endl;
         }
     }
     // ****************************************************
