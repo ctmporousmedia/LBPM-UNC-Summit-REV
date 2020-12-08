@@ -1253,6 +1253,18 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     //////////////////////////////////////////////////////
     //// maxdist is too large, takes forever to run as is
     //////////////////////////////////////////////////////
+
+    ///Set corners on SignDist map to 0's
+    for (int k=0; k<nz; k++){
+        for (int j=0; j<ny; j++){
+            for (int i=0; i<nx; i++){
+                if ( SignDist(i,j,k) > 999.0){
+                    SignDist(i,j,k) = 0.0;
+                }
+            }
+        }
+    }
+
     
     for (int k=1; k<nz-1; k++){
         for (int j=1; j<ny-1; j++){
@@ -1519,7 +1531,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
         double vF=0.0; double vS=0.0;
         ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,vF,vS,phase_label,Dm->Comm);
         MPI_Barrier(Dm->Comm);
-        
+
         for (int k=0; k<nz; k++){
             for (int j=0; j<ny; j++){
                 for (int i=0; i<nx; i++){
@@ -1530,6 +1542,23 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
                 }
             }
         }
+
+
+        //Count blobs again for degbugging
+        for (int k=0; k<nz; k++){
+            for (int j=0; j<ny; j++){
+                for (int i=0; i<nx; i++){
+                    n=k*nx*ny+j*nx+i;
+                    if (ReadID[n] == 1){
+                        phase(i,j,k) = 1.0;
+                    } else {
+                        phase(i,j,k) = -1.0;
+                    }
+                }
+            }
+        }
+
+        ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,0.0,0.0,phase_label,Dm->Comm);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         //Number of n blobs at this point should be equal to one, can add in the "phase" for loop from above and the computeglobalblobids to check,

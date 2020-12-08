@@ -649,7 +649,7 @@ int main(int argc, char **argv)
         
         MPI_Barrier(comm);
 
-        for (int k=0; k<Nz; k++){
+        /*for (int k=0; k<Nz; k++){
             for (int j=0; j<Ny; j++){
                 for (int i=0; i<Nx; i++){
                     int nsds = k*Nx*Ny+j*Nx+i;
@@ -658,7 +658,7 @@ int main(int argc, char **argv)
                     }
                 }
             }
-        }
+        }*/
 
         
         /* Check the porosity */

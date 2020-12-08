@@ -111,11 +111,16 @@ static const std::string id_map_filename = "lbpm_id_map.txt";
 class BlobIdentificationWorkItem1: public ThreadPool::WorkItemRet<void>
 {
 public:
-    BlobIdentificationWorkItem1( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
+    /*BlobIdentificationWorkItem1( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
                                 std::shared_ptr<const DoubleArray> phase_, const DoubleArray& dist_,
-                                BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_, runAnalysis::commWrapper&& comm_ ):
-    timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
-    phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
+                                BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_, runAnalysis::commWrapper&& comm_ ):*/
+    /*timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
+    phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))*/
+    BlobIdentificationWorkItem1( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
+            const DoubleArray& SDN_, const DoubleArray& dist_,
+            BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_, runAnalysis::commWrapper&& comm_ ):
+                timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
+                SDN(SDN_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
     {
     }
     ~BlobIdentificationWorkItem1() { }
@@ -125,7 +130,8 @@ public:
         double vF = 0.0;
         double vS = -1.0; // one voxel buffer region around solid
         IntArray& ids = new_index->second;
-        new_index->first = ComputeGlobalBlobIDs(Nx-2,Ny-2,Nz-2,rank_info,*phase,dist,vF,vS,ids,comm.comm);
+        //new_index->first = ComputeGlobalBlobIDs(Nx-2,Ny-2,Nz-2,rank_info,*phase,dist,vF,vS,ids,comm.comm);
+        new_index->first = ComputeGlobalBlobIDs(Nx-2,Ny-2,Nz-2,rank_info,SDN,dist,vF,vS,ids,comm.comm);
         PROFILE_STOP("Identify blobs",1);
     }
 private:
@@ -133,7 +139,8 @@ private:
     int timestep;
     int Nx, Ny, Nz;
     const RankInfoStruct& rank_info;
-    std::shared_ptr<const DoubleArray> phase;
+    //std::shared_ptr<const DoubleArray> phase;
+    const DoubleArray& SDN;
     const DoubleArray& dist;
     BlobIDstruct last_id, new_index, new_id;
     BlobIDList new_list;
@@ -142,11 +149,16 @@ private:
 class BlobIdentificationWorkItem2: public ThreadPool::WorkItemRet<void>
 {
 public:
-    BlobIdentificationWorkItem2( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
+    /*BlobIdentificationWorkItem2( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
                                 std::shared_ptr<const DoubleArray> phase_, const DoubleArray& dist_,
                                 BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_ , runAnalysis::commWrapper&& comm_ ):
     timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
-    phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
+    phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))*/
+    BlobIdentificationWorkItem2( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
+                                const DoubleArray& SDN_, const DoubleArray& dist_,
+                                BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_ , runAnalysis::commWrapper&& comm_ ):
+    timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
+    SDN(SDN_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
     {
     }
     ~BlobIdentificationWorkItem2() { }
@@ -178,7 +190,8 @@ private:
     int timestep;
     int Nx, Ny, Nz;
     const RankInfoStruct& rank_info;
-    std::shared_ptr<const DoubleArray> phase;
+    //std::shared_ptr<const DoubleArray> phase;
+    const DoubleArray& SDN;
     const DoubleArray& dist;
     BlobIDstruct last_id, new_index, new_id;
     BlobIDList new_list;
@@ -258,14 +271,14 @@ public:
 
         
         
-        
         ASSERT(visData[0].vars[0]->name=="phase");
         ASSERT(visData[0].vars[1]->name=="Pressure");
         ASSERT(visData[0].vars[2]->name=="Velocity_x");
         ASSERT(visData[0].vars[3]->name=="Velocity_y");
         ASSERT(visData[0].vars[4]->name=="Velocity_z");
         ASSERT(visData[0].vars[5]->name=="SignDist");
-        ASSERT(visData[0].vars[6]->name=="DelPhi");
+        //ASSERT(visData[0].vars[6]->name=="DelPhi");
+        ASSERT(visData[0].vars[6]->name=="BlobID");
         ASSERT(visData[0].vars[7]->name=="DensityB");
 
         Array<double>& PhaseData = visData[0].vars[0]->data;
@@ -274,7 +287,8 @@ public:
         Array<double>& VelyData = visData[0].vars[3]->data;
         Array<double>& VelzData = visData[0].vars[4]->data;
         Array<double>& SignData  = visData[0].vars[5]->data;
-        Array<double>& MTDenData  = visData[0].vars[6]->data;
+        //Array<double>& MTDenData  = visData[0].vars[6]->data;
+        Array<double>& BlobData  = visData[0].vars[6]->data;
         Array<double>& MTDenData2  = visData[0].vars[7]->data;
 
         fillData.copy(Averages.Phase,PhaseData);
@@ -283,9 +297,9 @@ public:
         fillData.copy(Averages.Vel_x,VelxData);
         fillData.copy(Averages.Vel_y,VelyData);
         fillData.copy(Averages.Vel_z,VelzData);
-        fillData.copy(Averages.ParticularSDs,MTDenData);
+        //fillData.copy(Averages.ParticularSDs,MTDenData);
+        fillData.copy(Averages.Label_NWP,BlobData);
         fillData.copy(Averages.VFmask,MTDenData2);
-        
         
         ASSERT(visData[0].vars[8]->name=="ID");
         Array<double>& IDData = visData[0].vars[8]->data;
@@ -398,6 +412,59 @@ private:
     bool ComputeAccurateNWPhaseVolume;
 };
 
+class ComponentWorkItem: public ThreadPool::WorkItemRet<void>
+{
+public:
+    ComponentWorkItem( AnalysisType type_, int timestep_, TwoPhase& Averages_,
+            BlobIDstruct ids, BlobIDList id_list_, double beta_ ):
+                type(type_), timestep(timestep_), Averages(Averages_),
+                blob_ids(ids), id_list(id_list_), beta(beta_) { }
+    ~ComponentWorkItem() { }
+    virtual void run() {
+        Averages.NumberComponents_NWP = blob_ids->first;
+        Averages.Label_NWP = blob_ids->second;
+        Averages.Label_NWP_map = *id_list;
+        Averages.NumberComponents_WP = 1;
+        Averages.Label_WP.fill(0.0);
+        if ( matches(type,AnalysisType::ComputeAverages) ) {
+            PROFILE_START("Compute comp",1);
+            Averages.Initialize();
+        
+            Averages.UpdateSolid();
+            
+            
+            Averages.ColorToSignedDistance(1.0,Averages.TempPhase,Averages.Phase);
+            Averages.ZeroSolidPhaseLatticeSites(); // Naive average works well enough
+
+            Averages.MeanFilter();
+            Averages.MeanFilter();
+            Averages.MeanFilter();
+            Averages.MeanFilter();
+            
+            Averages.ComputeDelPhi();
+            Averages.ColorToSignedDistance(-1.0,Averages.Phase,Averages.SDn);
+            Averages.ColorToSignedDistance(-1.0,Averages.Phase_tplus,Averages.SDn_tplus);
+            Averages.UpdateMeshValues();
+
+            Averages.ComponentAverages();
+            Averages.SortBlobs();
+            Averages.PrintComponents(timestep);
+
+            PROFILE_STOP("Compute comp",1);
+        }
+    }
+private:
+    ComponentWorkItem();
+    AnalysisType type;
+    int timestep;
+    TwoPhase& Averages;
+    BlobIDstruct blob_ids;
+    BlobIDList id_list;
+    double beta;
+    bool geometry;
+    bool ComputeAccurateNWPhaseVolume;
+};
+
 
 /******************************************************************
  *  MPI comm wrapper for use with analysis                         *
@@ -450,20 +517,21 @@ runAnalysis::commWrapper runAnalysis::getComm( )
 runAnalysis::runAnalysis( std::shared_ptr<Database> db,
                          const RankInfoStruct& rank_info, std::shared_ptr<ScaLBL_Communicator> ScaLBL_Comm, std::shared_ptr <Domain> Dm,
                          int Np, bool Regular, double beta, IntArray Map ):
-d_Np( Np ),
-d_beta( beta ),
-d_regular ( Regular),
-d_rank_info( rank_info ),
-d_Map( Map ),
-d_fillData(Dm->Comm,Dm->rank_info,{Dm->Nx-2,Dm->Ny-2,Dm->Nz-2},{1,1,1},0,1),
-d_ScaLBL_Comm( ScaLBL_Comm)
+    d_Np( Np ),
+    d_beta( beta ),
+    d_regular ( Regular),
+    d_rank_info( rank_info ),
+    d_Map( Map ),
+    d_fillData(Dm->Comm,Dm->rank_info,{Dm->Nx-2,Dm->Ny-2,Dm->Nz-2},{1,1,1},0,1),
+    d_ScaLBL_Comm( ScaLBL_Comm)
 {
     
     // Ids of work items to use for dependencies
-    //  ThreadPool::thread_id_t d_wait_blobID;
+    ThreadPool::thread_id_t d_wait_blobID;
     ThreadPool::thread_id_t d_wait_analysis;
     ThreadPool::thread_id_t d_wait_vis;
     ThreadPool::thread_id_t d_wait_restart;
+    ThreadPool::thread_id_t d_wait_component;
     
     char rankString[20];
     sprintf(rankString,"%05d",Dm->rank());
@@ -474,6 +542,7 @@ d_ScaLBL_Comm( ScaLBL_Comm)
     d_analysis_interval = db->getScalar<int>( "analysis_interval" );
     d_blobid_interval = db->getScalar<int>( "blobid_interval" );
     d_visualization_interval = db->getScalar<int>( "visualization_interval" );
+    d_component_interval = db->getScalar<int>( "component_interval");
     auto restart_file = db->getScalar<std::string>( "restart_file" );
     d_restartFile = restart_file + "." + rankString;
     d_rank = MPI_WORLD_RANK();
@@ -496,14 +565,14 @@ d_ScaLBL_Comm( ScaLBL_Comm)
     auto SignDistVar = std::make_shared<IO::Variable>();
     
     
-//        auto BlobIDVar = std::make_shared<IO::Variable>();
+    auto BlobIDVar = std::make_shared<IO::Variable>();
 //        auto SDnVar = std::make_shared<IO::Variable>();
-        auto SDwVar = std::make_shared<IO::Variable>();
+    auto SDwVar = std::make_shared<IO::Variable>();
     
-        auto BCVar = std::make_shared<IO::Variable>();
-        auto AVar = std::make_shared<IO::Variable>();
-        auto DVar = std::make_shared<IO::Variable>();
-        auto QVar = std::make_shared<IO::Variable>();
+    auto BCVar = std::make_shared<IO::Variable>();
+    auto AVar = std::make_shared<IO::Variable>();
+    auto DVar = std::make_shared<IO::Variable>();
+    auto QVar = std::make_shared<IO::Variable>();
 //        auto LVar = std::make_shared<IO::Variable>();
 //        auto SVFVar = std::make_shared<IO::Variable>();
     
@@ -515,10 +584,10 @@ d_ScaLBL_Comm( ScaLBL_Comm)
 //        auto MTMassVar = std::make_shared<IO::Variable>();
 //        auto MTMassVar2 = std::make_shared<IO::Variable>();
 //
-        auto BCVar2 = std::make_shared<IO::Variable>();
-        auto AVar2 = std::make_shared<IO::Variable>();
-        auto DVar2 = std::make_shared<IO::Variable>();
-        auto QVar2 = std::make_shared<IO::Variable>();
+    auto BCVar2 = std::make_shared<IO::Variable>();
+    auto AVar2 = std::make_shared<IO::Variable>();
+    auto DVar2 = std::make_shared<IO::Variable>();
+    auto QVar2 = std::make_shared<IO::Variable>();
     
     auto GradPhiXVar = std::make_shared<IO::Variable>();
     auto GradPhiYVar = std::make_shared<IO::Variable>();
@@ -560,11 +629,17 @@ d_ScaLBL_Comm( ScaLBL_Comm)
     SignDistVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
     d_meshData[0].vars.push_back(SignDistVar);
     
-    MTDenVar->name = "DelPhi";
-    MTDenVar->type = IO::VariableType::VolumeVariable;
-    MTDenVar->dim = 1;
-    MTDenVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(MTDenVar);
+    //MTDenVar->name = "DelPhi";
+    //MTDenVar->name = "BlobID";
+    //MTDenVar->type = IO::VariableType::VolumeVariable;
+    //MTDenVar->dim = 1;
+    //MTDenVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    //d_meshData[0].vars.push_back(MTDenVar);
+    BlobIDVar->name = "BlobID";
+    BlobIDVar->type = IO::VariableType::VolumeVariable;
+    BlobIDVar->dim = 1;
+    BlobIDVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    d_meshData[0].vars.push_back(BlobIDVar);
     MTDenVar2->name = "DensityB";
     MTDenVar2->type = IO::VariableType::VolumeVariable;
     MTDenVar2->dim = 1;
@@ -572,12 +647,11 @@ d_ScaLBL_Comm( ScaLBL_Comm)
     d_meshData[0].vars.push_back(MTDenVar2);
     
     
-    
-//        BlobIDVar->name = "BlobID";
-//        BlobIDVar->type = IO::VariableType::VolumeVariable;
-//        BlobIDVar->dim = 1;
-//        BlobIDVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-//        d_meshData[0].vars.push_back(BlobIDVar);
+    //BlobIDVar->name = "BlobID";
+    //BlobIDVar->type = IO::VariableType::VolumeVariable;
+    //BlobIDVar->dim = 1;
+    //BlobIDVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    //d_meshData[0].vars.push_back(BlobIDVar);
 //        SDnVar->name = "SDnID";
 //        SDnVar->type = IO::VariableType::VolumeVariable;
 //        SDnVar->dim = 1;
@@ -688,11 +762,6 @@ d_ScaLBL_Comm( ScaLBL_Comm)
         d_meshData[0].vars.push_back(GradPhiZVar);
 
     
-
-    
-    
-
-    
     
     // Initialize the comms
     MPI_Comm_dup(MPI_COMM_WORLD,&d_comm);
@@ -722,8 +791,9 @@ void runAnalysis::finish( )
     // Wait for the work items to finish
     d_tpool.wait_pool_finished();
     // Clear the wait ids
-    // d_wait_blobID.reset();
+    d_wait_blobID.reset();
     d_wait_analysis.reset();
+    d_wait_component.reset();
     d_wait_vis.reset();
     d_wait_restart.reset();
     // Syncronize
@@ -795,10 +865,10 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
         // printf("Copy phase indicator,timestep=%i\n",timestep);
         type |= AnalysisType::CopyPhaseIndicator;
     }
-    //    if ( timestep%d_blobid_interval == 0 ) {
+    if ( timestep%d_blobid_interval == 0 ) {
     // Identify blobs and update global ids in time
-    //  type |= AnalysisType::IdentifyBlobs;
-    //    }
+       type |= AnalysisType::IdentifyBlobs;
+        }
     /*#ifdef USE_CUDA
      if ( tpool.getQueueSize()<=3 && tpool.getNumThreads()>0 && timestep%50==0 ) {
      // Keep a few blob identifications queued up to keep the processors busy,
@@ -811,12 +881,15 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
         // Copy the averages to the CPU (and identify blobs)
         //printf("Copy sim state, timestep=%i \n",timestep);
         type |= AnalysisType::CopySimState;
-        //   type |= AnalysisType::IdentifyBlobs;
+        type |= AnalysisType::IdentifyBlobs;
     }
     if ( timestep%d_analysis_interval == 0 ) {
         // Run the analysis
         //printf("Compute averages, timestep=%i \n",timestep);
         type |= AnalysisType::ComputeAverages;
+    }
+    if ( timestep%d_component_interval == 0) {
+        type |= AnalysisType::ComputeComponents;
     }
     if (timestep%d_restart_interval == 0) {
         // Write the restart file
@@ -826,7 +899,7 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
         // Write the visualization data
         type |= AnalysisType::WriteVis;
         type |= AnalysisType::CopySimState;
-        //   type |= AnalysisType::IdentifyBlobs;
+        type |= AnalysisType::IdentifyBlobs;
     }
     return type;
 }
@@ -871,6 +944,7 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     ScaLBL_DeviceBarrier();
     PROFILE_START("Copy data to host",1);
     std::shared_ptr<DoubleArray> phase;
+    std::shared_ptr<DoubleArray> SDN;
     
     
     //if ( matches(type,AnalysisType::CopyPhaseIndicator) ) {
@@ -937,37 +1011,65 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     
     // Spawn threads to do blob identification work
     if ( matches(type,AnalysisType::IdentifyBlobs) ) {
-        // if ( d_rank == 0 )  { printf("IdentifyBlobs being called?\n");  }
-        //        phase = std::shared_ptr<DoubleArray>(new DoubleArray(d_N[0],d_N[1],d_N[2]));
-        //
-        //        ScaLBL_CopyToHost(phase->data(),Phi,N*sizeof(double));
-        //        Averages.Dm->CommunicateMeshHalo(*phase);
-        //
-        //        BlobIDstruct new_index(new std::pair<int,IntArray>(0,IntArray()));
-        //        BlobIDstruct new_ids(new std::pair<int,IntArray>(0,IntArray()));
-        //        BlobIDList new_list(new std::vector<BlobIDType>());
-        //        auto work1 = new BlobIdentificationWorkItem1(timestep,d_N[0],d_N[1],d_N[2],d_rank_info,
-        //            phase,Averages.SDs,d_last_ids,new_index,new_ids,new_list,getComm());
-        //        auto work2 = new BlobIdentificationWorkItem2(timestep,d_N[0],d_N[1],d_N[2],d_rank_info,
-        //            phase,Averages.SDs,d_last_ids,new_index,new_ids,new_list,getComm());
-        //        work1->add_dependency(d_wait_blobID);
-        //        work2->add_dependency(d_tpool.add_work(work1));
-        //        d_wait_blobID = d_tpool.add_work(work2);
-        //        d_last_index = new_index;
-        //        d_last_ids = new_ids;
-        //        d_last_id_map = new_list;
+        if ( d_rank == 0 )  { printf("IdentifyBlobs being called at timestep %i \n",timestep);  }
+                phase = std::shared_ptr<DoubleArray>(new DoubleArray(d_N[0],d_N[1],d_N[2]));
+        
+                ScaLBL_CopyToHost(phase->data(),Phi,N*sizeof(double));
+                Averages.Dm->CommunicateMeshHalo(*phase);
+         
+                Averages.ZeroSolidPhaseLatticeSites(); // Naive average works well enough
+
+                Averages.MeanFilter();
+                Averages.MeanFilter();
+                Averages.MeanFilter();
+                Averages.MeanFilter();
+                
+                Averages.ColorToSignedDistance(-1.0,Averages.Phase,Averages.SDn);
+                Averages.Dm->CommunicateMeshHalo(Averages.SDn);
+
+                BlobIDstruct new_index(new std::pair<int,IntArray>(0,IntArray()));
+                BlobIDstruct new_ids(new std::pair<int,IntArray>(0,IntArray()));
+                BlobIDList new_list(new std::vector<BlobIDType>());
+                auto work1 = new BlobIdentificationWorkItem1(timestep,d_N[0],d_N[1],d_N[2],d_rank_info,
+                    Averages.SDn,Averages.SDs,d_last_ids,new_index,new_ids,new_list,getComm());
+                auto work2 = new BlobIdentificationWorkItem2(timestep,d_N[0],d_N[1],d_N[2],d_rank_info,
+                    Averages.SDn,Averages.SDs,d_last_ids,new_index,new_ids,new_list,getComm());
+                work1->add_dependency(d_wait_blobID);
+                work2->add_dependency(d_tpool.add_work(work1));
+                d_wait_blobID = d_tpool.add_work(work2);
+                d_last_index = new_index;
+                d_last_ids = new_ids;
+                d_last_id_map = new_list;
     }
     
     // Spawn threads to do the analysis work
-    //if (timestep%d_restart_interval==0){
-    // if ( matches(type,AnalysisType::ComputeAverages) ) {
+
     if ( timestep%d_analysis_interval == 0 ) {
         auto work = new AnalysisWorkItem(type,timestep,Averages,d_last_index,d_last_id_map,d_beta);
-        //  work->add_dependency(d_wait_blobID);
+        //auto work = new AnalysisWorkItem(type,timestep,Averages,d_beta);
+        work->add_dependency(d_wait_blobID);
         work->add_dependency(d_wait_analysis);
         work->add_dependency(d_wait_vis);     // Make sure we are done using analysis before modifying
         d_wait_analysis = d_tpool.add_work(work);
     }
+
+    if ( timestep%d_component_interval == 0 ) {
+        auto work = new ComponentWorkItem(type,timestep,Averages,d_last_index,d_last_id_map,d_beta);
+        work->add_dependency(d_wait_blobID);
+        //work->add_dependency(d_wait_analysis);
+        work->add_dependency(d_wait_component);
+        d_wait_component = d_tpool.add_work(work);
+    }
+
+    //if (timestep%d_restart_interval==0){
+    // if ( matches(type,AnalysisType::ComputeAverages) ) {
+    /*if ( timestep%d_analysis_interval == 0 ) {
+        auto work = new AnalysisWorkItem(type,timestep,Averages,d_last_index,d_last_id_map,d_beta);
+        work->add_dependency(d_wait_blobID);
+        work->add_dependency(d_wait_analysis);
+        work->add_dependency(d_wait_vis);     // Make sure we are done using analysis before modifying
+        d_wait_analysis = d_tpool.add_work(work);
+    }*/
     
     if (timestep%d_restart_interval==0){
         if (d_rank==0) {
@@ -986,7 +1088,7 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     if (timestep%d_visualization_interval==0){
         // Write the vis files
         auto work = new WriteVisWorkItem( timestep, d_meshData, Averages, d_fillData, getComm() );
-        //  work->add_dependency(d_wait_blobID);
+        work->add_dependency(d_wait_blobID);
         work->add_dependency(d_wait_analysis);
         work->add_dependency(d_wait_vis);
         d_wait_vis = d_tpool.add_work(work);

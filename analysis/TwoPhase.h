@@ -262,6 +262,8 @@ private:
 	DoubleArray InterfaceSpeed;
 	DoubleArray NormalVector;
 
+    DoubleArray RecvBuffer;
+
 	char *TempID;
 
 	// CSV / text file where time history of averages is saved
@@ -393,7 +395,7 @@ public: // sub-domain averages
     DoubleArray JnsS_sub;
     DoubleArray KnsS_sub;
 
-    IntArray ID;
+    //IntArray ID;
     
     DoubleArray NxArray;
     DoubleArray NyArray;
@@ -553,13 +555,13 @@ public: // Internal data
     std::array<size_t,3> subdivide;
 	size_t Nx,Ny,Nz;
 	IntArray PhaseID;	// Phase ID array (solid=0, non-wetting=1, wetting=2)
-    
+    IntArray ID;
 	BlobIDArray Label_WP;   // Wetting phase label
 	BlobIDArray Label_NWP;  // Non-wetting phase label index (0:nblobs-1)
 	std::vector<BlobIDType> Label_NWP_map;  // Non-wetting phase label for each index
 	DoubleArray SDn;
     DoubleArray TempPhase;
-     
+    DoubleArray TempPhase2;
     DoubleArray ParticularSDs;
     
     
@@ -569,6 +571,11 @@ public: // Internal data
 	DoubleArray Press;
 	DoubleArray dPdt;
     DoubleArray PhiField;
+    DoubleArray BlobID;
+    DoubleArray MeanCurvature;
+	DoubleArray GaussCurvature;
+    DoubleArray MeanCurvatureW;
+    DoubleArray GaussCurvatureW;
     
 	DoubleArray SDs_x;		// Gradient of the signed distance
 	DoubleArray SDs_y;
