@@ -44,7 +44,9 @@
 
 #include <math.h>
 
-
+#include <iostream>
+#include <fstream>
+using namespace std;
 
 #include "analysis/pmmc.h"
 #include "common/Domain.h"
@@ -84,12 +86,12 @@
 #define VY 12
 #define VZ 13
 #define VSQ 14
-#define VWNX 15
-#define VWNY 16
-#define VWNZ 17
-#define VWNSX 18
-#define VWNSY 19
-#define VWNSZ 20
+#define VNWX 15
+#define VNWY 16
+#define VNWZ 17
+#define VNWSX 18
+#define VNWSY 19
+#define VNWSZ 20
 #define GWNXX 21
 #define GWNYY 22
 #define GWNZZ 23
@@ -121,7 +123,7 @@ nc(0), kstart(0), kfinish(0), fluid_isovalue(0), solid_isovalue(0),    Volume(0)
 TIMELOG_local(nullptr), TIMELOG_global(nullptr), NWPLOG(nullptr), WPLOG(nullptr),
 Dm(dm), NumberComponents_WP(0), NumberComponents_NWP(0), trimdist(0),
 porosity(0), poreVol(0), awn(0), ans(0), aws(0), lwns(0), aw(0), an(0), Xn(0), pwn(0), wp_volume(0), nwp_volume(0),
-As(0), vol_w(0), vol_n(0), vwndnw(0), vwndnw_global(0), Jws(0), Kws(0), euler(0), euler_global(0), eulerW(0), eulerW_global(0),
+As(0), vol_w(0), vol_n(0), vnwdnw(0), vnwdnw_global(0), Jws(0), Kws(0), euler(0), euler_global(0), eulerW(0), eulerW_global(0),
 pn(0), pw(0), pn_global(0), pw_global(0), swn(0), swn_global(0), vol_w_global(0), vol_n_global(0),
 awn_global(0), ans_global(0),aws_global(0), lwns_global(0), efawns(0), efawns_global(0), JnsS(0), JnsS_global(0), KnsS(0),KnsS_global(0),
 JwsS(0),JwsS_global(0), KwsS(0),KwsS_global(0),eulerS(0),eulerS_global(0),
@@ -132,14 +134,13 @@ As_global(0), wwndnw_global(0), wwnsdnwn_global(0), Jwnwwndnw_global(0), dEs(0),
 subdivide( sub )
 {
     Nx=dm->Nx; Ny=dm->Ny; Nz=dm->Nz;
-    //printf("Nx=%d\n",Nx);
+
     npx = Dm->nprocx();
     npy = Dm->nprocy();
     npz = Dm->nprocz();
     Volume=1.0*double((Nx-2)*(Ny-2)*(Nz-2)*npx*npy*npz);
-    // printf("Volume=%.9f\n",Volume);
+
     nodeVolume = 1.0*double((Nx-2)*(Ny-2)*(Nz-2));
-    
     
     temp_tplus.resize(Nx,Ny,Nz);   temp_tplus.fill(0);
     
@@ -163,6 +164,9 @@ subdivide( sub )
     
     SDn_tplus.resize(Nx,Ny,Nz);           SDn_tplus.fill(0);
     SDw_tplus.resize(Nx,Ny,Nz);           SDw_tplus.fill(0);
+
+    SDw_tplusplus.resize(Nx,Ny,Nz);           SDw_tplusplus.fill(0);
+    SDn_tplusplus.resize(Nx,Ny,Nz);           SDn_tplusplus.fill(0);
     
     BCarray.resize(Nx,Ny,Nz); BCarray.fill(0);
     Aarray.resize(Nx,Ny,Nz);  Aarray.fill(0);
@@ -174,8 +178,7 @@ subdivide( sub )
     Darray2.resize(Nx,Ny,Nz);  Darray2.fill(0);
     Qarray2.resize(Nx,Ny,Nz);  Qarray2.fill(0);
     
-    
-    
+    VFPhase.resize(Nx,Ny,Nz);   VFPhase.fill(0);
     
     TempPhase.resize(Nx,Ny,Nz);     TempPhase.fill(0);
     
@@ -251,10 +254,10 @@ subdivide( sub )
     vw.resize(3);
     
     nw.resize(3);
-    vwn.resize(3);
+    vnw.resize(3);
     vws.resize(3);
     vns.resize(3);
-    vwns.resize(3);
+    vnws.resize(3);
     Gwn.resize(6);
     Gns.resize(6);
     Gws.resize(6);
@@ -264,10 +267,10 @@ subdivide( sub )
     
     
     nw_global.resize(3);
-    vwn_global.resize(3);
+    vnw_global.resize(3);
     vws_global.resize(3);
     vns_global.resize(3);
-    vwns_global.resize(3);
+    vnws_global.resize(3);
     Gwn_global.resize(6);
     Gns_global.resize(6);
     Gws_global.resize(6);
@@ -275,6 +278,7 @@ subdivide( sub )
     // Allocate subdomain variables
     
     Eta_sub.resize( { subdivide[0], subdivide[1], subdivide[2] } );
+    Eta_sub1.resize( { subdivide[0], subdivide[1], subdivide[2] } );
     trimdist_sub.resize( { subdivide[0], subdivide[1], subdivide[2] } );
     swn_sub.resize( { subdivide[0], subdivide[1], subdivide[2] } );
     porosity_sub.resize( { subdivide[0], subdivide[1], subdivide[2] } );
@@ -332,8 +336,8 @@ subdivide( sub )
     
     vws_sub.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
     vns_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 3 } );
-    vwn_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 3 } );
-    vwns_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 3 } );
+    vnw_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 3 } );
+    vnws_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 3 } );
     Gwn_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
     Gns_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
     Gws_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
@@ -342,22 +346,21 @@ subdivide( sub )
     Xn_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
     aw_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
     an_sub.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
+
+    an_sub1.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
+    an_sub2.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
+    an_sub3.resize( { subdivide[0], subdivide[1], subdivide[2], 6 } );
     
     qDistances.resize(Nx*Ny*Nz*18); qDistances.fill(-9);
-    
-    
     
     // w^wn
     wwn.resize(3);
     wwn_global.resize(3);
     wwn_sub.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
     
-    
-    
     nwOwnO.resize(3);
     nwOwnO_global.resize(3);
     nwOwnO_sub.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
-    
     
     nwOwnO2.resize(3);
     nwOwnO_global2.resize(3);
@@ -366,6 +369,14 @@ subdivide( sub )
     nwOwsO.resize(3);
     nwOwsO_global.resize(3);
     nwOwsO_sub.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
+
+    nwOwsO2.resize(3);
+    nwOwsO_global2.resize(3);
+    nwOwsO_sub2.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
+    
+    nwOnsO2.resize(3);
+    nwOnsO_global2.resize(3);
+    nwOnsO_sub2.resize({ subdivide[0], subdivide[1], subdivide[2], 3 } );
     
     // Create global files
     if (Dm->rank()==0){
@@ -381,11 +392,11 @@ subdivide( sub )
             "p_n^{wn}* X^n* eps^w eps^n "
             "G_{xx}^{wns}* G_{yy}^{wns}* G_{zz}^{wns}* G_{xy}^{wns}* G_{xz}^{wns}* G_{yz}^{wns}* "
             "v_x^{ws}* v_y^{ws}* v_z^{ws}* v_x^{ns}* v_y^{ns}* v_z^{ns}* "
-            "nw_x- nw_y- nw_z- vwndnw- wwnx- wwny- wwnz- Jwn2* Kwn2* Ca Re";
+            "nw_x- nw_y- nw_z- Eta- wwnx- wwny- wwnz- Ca Re";
             fprintf(TIMELOG_global,"%s\n",header);
         }
         
-        NWPLOG = fopen("components.NWP.tcat","a+");
+        /*NWPLOG = fopen("components.NWP.tcat","a+");
         fprintf(NWPLOG,"time label vol p^n awn ans J_n^{wn} K_n^{wn} lwns c^{wns} kappa_N^{wns} kappa_G^{wns} ");
         fprintf(NWPLOG,"v_x^n v_y^n v_z^n v_x^{wn} v_y^{wn} v_z^{wn} v_x^{wns} v_y^{wns} v_z^{wns} ");
         fprintf(NWPLOG,"G_{xx}^{wn} G_{yy}^{wn} G_{zz}^{wn} G_{xy}^{wn} G_{xz}^{wn} G_{yz}^{wn} ");
@@ -397,7 +408,13 @@ subdivide( sub )
         fprintf(WPLOG,"v_x^w v_y^w v_z^w v_x^{wn} v_y^{wn} v_z^{wn} v_x^{wns} v_y^{wns} v_z^{wns} ");
         fprintf(WPLOG,"G_{xx}^{wn} G_{yy}^{wn} G_{zz}^{wn} G_{xy}^{wn} G_{xz}^{wn} G_{yz}^{wn} ");
         fprintf(WPLOG,"G_{xx}^{ws} G_{yy}^{ws} G_{zz}^{ws} G_{xy}^{ws} G_{xz}^{ws} G_{yz}^{ws} ");
-        fprintf(WPLOG,"Cx Cy Cz vsq \n");
+        fprintf(WPLOG,"Cx Cy Cz vsq \n");*/
+
+        NWPLOG = fopen("components.NWP.tcat","a+");
+        fprintf(NWPLOG,"time label vol \n");
+        
+        WPLOG = fopen("components.WP.tcat","a+");
+        fprintf(WPLOG,"time label vol \n");        
     }
     
     // Create the local files
@@ -409,8 +426,6 @@ subdivide( sub )
         std::string filename = "timelog.tcat." + rankStr;
         TIMELOG_local = fopen(filename.c_str(),"a+");
         
-        
-        
         const char header[] = "time porosity "                  // Timestep, porosity, Change in Surface Energy
         "s^w p^w p^n eps^{wn} eps^{ns} eps^{ws} J_n^{wn} K_n^{wn} l^{wns} c^{wns} kappa_N^{wns} kappa_G^{wns} " // Scalar averages
         "v_x^w v_y^w v_z^w v_x^n v_y^n v_z^n v_x^{wn} v_y^{wn} v_z^{wn} v_x^{wns} v_y^{wns} v_z^{wns} " // Velocity averages
@@ -419,7 +434,8 @@ subdivide( sub )
         "G_{xx}^{ns} G_{yy}^{ns} G_{zz}^{ns} G_{xy}^{ns} G_{xz}^{ns} G_{yz}^{ns} "
         "p_n^{wn} X^n eps^w eps^n "
         "G_{xx}^{wns} G_{yy}^{wns} G_{zz}^{wns} G_{xy}^{wns} G_{xz}^{wns} G_{yz}^{wns} "
-        "v_x^{ws} v_y^{ws} v_z^{ws} v_x^{ns} v_y^{ns} v_z^{ns} nw_x nw_y nw_z vwndnw wwnx wwny wwnz Jwn2* Kwn2* Ca Re";
+        "v_x^{ws} v_y^{ws} v_z^{ws} v_x^{ns} v_y^{ns} v_z^{ns} "
+        "nw_x nw_y nw_z Eta wwnx wwny wwnz Ca Re";
         
         fprintf(TIMELOG_local,"%s\n",header);
         //   SUB-DIVIDE SECTION
@@ -453,7 +469,6 @@ double TwoPhase::SignedVolumeOfTriangle(Point p1, Point p2, Point p3) {
 }
 
 
-
 void TwoPhase::SetParams(double rhoA, double rhoB, double tauA, double tauB, double force_x, double force_y, double force_z, double alpha)
 {
     double Fx = force_x;
@@ -468,7 +483,6 @@ void TwoPhase::SetParams(double rhoA, double rhoB, double tauA, double tauB, dou
 }
 
 
-
 inline void MeanFilter2(DoubleArray &Temp, DoubleArray &Mesh, Array<int> & domain){}
 inline void MeanFilter3(DoubleArray &Temp, DoubleArray &Mesh, Array<int> & domain){}
 
@@ -479,7 +493,7 @@ void TwoPhase::ColorToSignedDistance(double Beta, DoubleArray &ColorData, Double
     for (int k=0; k<Nz; k++){
         for (int j=0; j<Ny; j++){
             for (int i=0; i<Nx; i++){
-                DistData(i,j,k) = Beta*ColorData(i,j,k);
+                DistData(i,j,k) = ColorData(i,j,k);
             }
         }
     }
@@ -487,28 +501,7 @@ void TwoPhase::ColorToSignedDistance(double Beta, DoubleArray &ColorData, Double
 
 void TwoPhase::SmoothSameSign(double Beta, DoubleArray &ColorData, DoubleArray &DistData){}
 void TwoPhase::MedianFilter(double Beta, DoubleArray &ColorData, DoubleArray &DistData){}
-
-
-
-
-void TwoPhase::ComputeDelPhi()
-{
-    int i,j,k;
-    double fx,fy,fz;
-    
-    
-    for (k=1; k<Nz-1; k++){
-        for (j=1; j<Ny-1; j++){
-            for (i=1; i<Nx-1; i++){
-                // Compute all of the derivatives using finite differences
-                fx = 0.5*(TempPhase(i+1,j,k) - TempPhase(i-1,j,k));
-                fy = 0.5*(TempPhase(i,j+1,k) - TempPhase(i,j-1,k));
-                fz = 0.5*(TempPhase(i,j,k+1) - TempPhase(i,j,k-1));
-                DelPhi(i,j,k) = sqrt(fx*fx+fy*fy+fz*fz);
-            }
-        }
-    }
-}
+void TwoPhase::ComputeDelPhi(){}
 
 void TwoPhase::ComputeSDw() {
     
@@ -530,38 +523,36 @@ void TwoPhase::ComputeSDw() {
 }
 
 
-
 void TwoPhase::PosAdjustSDs() {
     
     int i,j,k,n;
-      int strideY = Nx;
-      int strideZ = Nx*Ny;
-      for (int k=0; k<Nz; k++) {
-          for (int j=0; j<Ny; j++) {
-              for (int i=0; i<Nx; i++) {
-                  size_t ijk = i + j * strideY + k * strideZ;
-                  SDs(ijk) += 1.1;
-              }
-          }
-      }
+    int strideY = Nx;
+    int strideZ = Nx*Ny;
+    for (int k=0; k<Nz; k++) {
+        for (int j=0; j<Ny; j++) {
+            for (int i=0; i<Nx; i++) {
+                size_t ijk = i + j * strideY + k * strideZ;
+                SDs(ijk) += 1.1;
+            }
+        }
+    }
 }
+
 
 void TwoPhase::NegAdjustSDs() {
     
     int i,j,k,n;
-      int strideY = Nx;
-      int strideZ = Nx*Ny;
-      for (int k=0; k<Nz; k++) {
-          for (int j=0; j<Ny; j++) {
-              for (int i=0; i<Nx; i++) {
-                  size_t ijk = i + j * strideY + k * strideZ;
-                  SDs(ijk) -= 1.1;
-              }
-          }
-      }
+    int strideY = Nx;
+    int strideZ = Nx*Ny;
+    for (int k=0; k<Nz; k++) {
+        for (int j=0; j<Ny; j++) {
+            for (int i=0; i<Nx; i++) {
+                size_t ijk = i + j * strideY + k * strideZ;
+                SDs(ijk) -= 1.1;
+            }
+        }
+    }
 }
-
-
 
 
 void TwoPhase::Initialize()
@@ -570,9 +561,16 @@ void TwoPhase::Initialize()
     Ca_global = 0;
     Re_global = 0;
     
-    awn2 = 0;
-    awn2_global = 0;
-    Jwn2 = Kwn2 = Jwn2_global = Kwn2_global = 0;
+    awn = 0;
+    awn_global = 0;
+
+    ans = 0;
+    ans_global = 0;
+    
+    aws = 0;
+    aws_global = 0;
+
+    Jwn = Kwn = Jwn_global = Kwn_global = 0;
     local_nw_phase_volume = 0.0;
     global_nw_phase_volume = 0.0;
     mass_local = 0.0;
@@ -580,14 +578,17 @@ void TwoPhase::Initialize()
     porosity = 0.0;
     porosity_sub.fill(0);
     porosity_global = 0;
-    an_sub.fill(0);
+
     aw_sub.fill(0);
     aw = 0;
-    an = 0;
     aw_global = 0;
+
+    an_sub.fill(0);
+    an = 0;
     an_global = 0;
     
-    
+    efawns_count = 0;
+
     vn.fill(0);
     vn_global.fill(0);
     
@@ -597,7 +598,6 @@ void TwoPhase::Initialize()
     vol_w_global = 0;
     vol_n_global = 0;
     
-    
     pn_sub.fill( 0.0 );
     pw_sub.fill( 0.0 );
     pn = pw = pwn = 0.0;
@@ -606,9 +606,11 @@ void TwoPhase::Initialize()
     Eta_sub.fill(0);
     Eta = Eta_global = 0;
     total_volume_global = 0;
+
+    Eta_sub1.fill(0);
+    Eta1 = Eta_global1 = 0;
     
-    
-    wsGlobal_dS = 0;
+    /*wsGlobal_dS = 0;
     nsGlobal_dS =0;
     nwGlobal_dS =0;
     
@@ -618,7 +620,7 @@ void TwoPhase::Initialize()
     
     nEuler = wEuler = sEuler = 0.0;
     nwEuler = nsEuler = wsEuler = 0.0;
-    nGlobalEuler = sGlobalEuler = wGlobalEuler = 0.0;
+    nGlobalEuler = sGlobalEuler = wGlobalEuler = 0.0;*/
     
     trimdist=0.0;
     fluid_isovalue = 0.0;
@@ -631,10 +633,10 @@ void TwoPhase::Initialize()
     pn = pw = pwn = 0.0;
     vw.fill( 0 );
     vn.fill( 0 );
-    vwn.fill( 0 );
+    vnw.fill( 0 );
     vws.fill( 0 );
     vns.fill( 0 );
-    vwns.fill( 0 );
+    vnws.fill( 0 );
     Gwn.fill( 0 );
     Gws.fill( 0 );
     Gns.fill( 0 );
@@ -646,7 +648,7 @@ void TwoPhase::Initialize()
     trJwn = trawn = trRwn = 0.0;
     euler = Jn = An = Kn = eulerW = 0.0;
     wwndnw = 0.0; wwnsdnwn = 0.0; Jwnwwndnw=0.0;
-    vwndnw = 0.0;
+    vnwdnw = 0.0;
     // Initialize subdomain variables
     trimdist_sub.fill( 0 );
     porosity_sub.fill( 0 );
@@ -675,11 +677,11 @@ void TwoPhase::Initialize()
     Kn_sub.fill( 0 );
     Jn_sub.fill( 0 );
     An_sub.fill( 0 );
+
     GaussCurvature.fill( 0 );
     GaussCurvatureW.fill( 0 );
     MeanCurvature.fill( 0 );
     MeanCurvatureW.fill( 0 );
-    
     
     Jwn_sub.fill( 0 );
     Kwn_sub.fill( 0 );
@@ -694,7 +696,6 @@ void TwoPhase::Initialize()
     KwnW = 0;
     JwnW_global = 0;
     KwnW_global = 0;
-    
     
     JwsS_sub.fill( 0 );
     KwsS_sub.fill( 0 );
@@ -716,17 +717,16 @@ void TwoPhase::Initialize()
     vw_sub.fill( 0 );
     vws_sub.fill( 0 );
     vns_sub.fill( 0 );
-    vwn_sub.fill( 0 );
-    vwns_sub.fill( 0 );
+    vnw_sub.fill( 0 );
+    vnws_sub.fill( 0 );
     Gwn_sub.fill( 0 );
     Gns_sub.fill( 0 );
     Gws_sub.fill( 0 );
     Gwns_sub.fill( 0 );
     
-    
-    //    vwndnw_sub.fill( 0 );
-    //    vwndnw = 0;
-    //    vwndnw_global = 0;
+    //    vnwdnw_sub.fill( 0 );
+    //    vnwdnw = 0;
+    //    vnwdnw_global = 0;
     
     wwn.fill( 0 );
     wwn_global.fill( 0 );
@@ -743,6 +743,10 @@ void TwoPhase::Initialize()
     nwOwsO_sub.fill( 0 );
     nwOwsO.fill( 0 );
     nwOwsO_global.fill( 0 );
+
+    nwOnsO_sub2.fill( 0 );
+    nwOnsO2.fill( 0 );
+    nwOnsO_global2.fill( 0 );
 }
 
 
@@ -763,14 +767,275 @@ void TwoPhase::UpdateSolid()
 }
 
 
+/*double TwoPhase::FiveCases(double & phi1, double & phi2, double & phi3, double & phi4) {
+    double temp;
+    double numerator, denominator;
+    
+    if (phi4 <= 0.0) {
+        return 1.0;
+    }
+    
+    if (phi3 <= 0 && phi4 > 0) {
+        numerator = phi4*phi4*phi4;
+        denominator = (phi4-phi1)*(phi4-phi2)*(phi4-phi3);
+        if (denominator == 0) return 1.0;
+        else { return 1.0-numerator/denominator;}
+    }
+    
+    if (phi2 <=0 && phi3 > 0) {
+        numerator = phi1*phi2*(phi3*phi3 + phi3*phi4 + phi4*phi4)
+        + phi3*phi4*( phi3*phi4 - (phi1 + phi2)*(phi3 + phi4) );
+        denominator = (phi1-phi3)*(phi2-phi3)*(phi1-phi4)*(phi2-phi4);
+        if (denominator == 0) return 0;
+        else { return numerator/denominator;}
+    }
+    
+    if (phi1 <=0 && phi2 > 0) {
+        numerator = -1.0*phi1*phi1*phi1;
+        denominator = (phi2-phi1)*(phi3-phi1)*(phi4-phi1);
+        if (denominator == 0) return 0;
+        else { return numerator/denominator;}
+    }
+    
+    if (phi1 > 0.0) {
+        return 0.0;
+    }
+    
+}*/
 
+/*oid TwoPhase::ComputeVolumeFraction(DoubleArray & A, DoubleArray & VFPhase) {
+    
+    // Cardinality
+    double Cardinality = 24.0;
+    double phi1,phi2,phi3,phi4;
+    double fraction = 0;
+    double x, X, y, Y, z, Z;
+    double sum;
+    
+    // Get centroid value
+    
+    double C0, C1, C2, C3, C4, C5, C6, C7, C8;
+    
+    vector<double> vec;
+    vec.resize(4);
+    
+    
+    for (int k=1; k<Nz-1; k++)
+        for (int j=1; j<Ny-1; j++)
+            for (int i=1; i<Nx-1; i++) {
+                sum = 0.0;
+                
+                // checked
+                C0 = A(i,j,k);
+                C1 = A(i+1,j,k);
+                C2 = A(i,j+1,k);
+                C3 = A(i,j,k+1);
+                
+                C4 = A(i+1,j+1,k);
+                C5 = A(i+1,j,k+1);
+                C6 = A(i,j+1,k+1);
+                C7 = A(i+1,j+1,k+1);
+                C8 = 0.125*( C0 + C1 + C2 + C3 + C4 + C5 + C6 + C7 );
+                
+                // checked
+                X = 0.25*( C1 + C4 + C7 + C5 );
+                x = 0.25*( C0 + C2 + C6 + C3 );
+                Y = 0.25*( C2 + C4 + C7 + C6 );
+                y = 0.25*( C0 + C1 + C5 + C3 );
+                Z = 0.25*( C3 + C5 + C7 + C6 );
+                z = 0.25*( C0 + C1 + C4 + C2 );
+                
+                // BOTTOM
+                // 1
+                vec.at(0) = C0; vec.at(1) = C1; vec.at(2) = z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 2
+                vec.at(0) = C1; vec.at(1) = C4; vec.at(2) = z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 3
+                vec.at(0) = C4; vec.at(1) = C2; vec.at(2) = z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 4
+                vec.at(0) = C2; vec.at(1) = C0; vec.at(2) = z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // TOP
+                // 5
+                vec.at(0) = C3; vec.at(1) = C5; vec.at(2) = Z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 6
+                vec.at(0) = C5; vec.at(1) = C7; vec.at(2) = Z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 7
+                vec.at(0) = C7; vec.at(1) = C6; vec.at(2) = Z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 8
+                vec.at(0) = C6; vec.at(1) = C3; vec.at(2) = Z; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // LEFT
+                // 9
+                vec.at(0) = C0; vec.at(1) = C1; vec.at(2) = y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 10
+                vec.at(0) = C1; vec.at(1) = C5; vec.at(2) = y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 11
+                vec.at(0) = C5; vec.at(1) = C3; vec.at(2) = y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 12
+                vec.at(0) = C3; vec.at(1) = C0; vec.at(2) = y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // RIGHT
+                // 13
+                vec.at(0) = C2; vec.at(1) = C4; vec.at(2) = Y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 14
+                vec.at(0) = C4; vec.at(1) = C7; vec.at(2) = Y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 15
+                vec.at(0) = C7; vec.at(1) = C6; vec.at(2) = Y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 16
+                vec.at(0) = C6; vec.at(1) = C2; vec.at(2) = Y; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // BACK
+                // 17
+                vec.at(0) = C0; vec.at(1) = C2; vec.at(2) = x; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 18
+                vec.at(0) = C2; vec.at(1) = C6; vec.at(2) = x; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 19
+                vec.at(0) = C6; vec.at(1) = C3; vec.at(2) = x; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 20
+                vec.at(0) = C3; vec.at(1) = C0; vec.at(2) = x; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // FRONT
+                // 21
+                vec.at(0) = C1; vec.at(1) = C4; vec.at(2) = X; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 22
+                vec.at(0) = C4; vec.at(1) = C7; vec.at(2) = X; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 23
+                vec.at(0) = C7; vec.at(1) = C5; vec.at(2) = X; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                // 24
+                vec.at(0) = C5; vec.at(1) = C1; vec.at(2) = X; vec.at(3) = C8;
+                sort(vec.begin(), vec.end()); phi1 = vec.at(0); phi2 = vec.at(1); phi3 = vec.at(2); phi4 = vec.at(3);
+                fraction = FiveCases(phi1, phi2, phi3, phi4);  sum += fraction;
+                
+                
+                
+                // RETURN
+                VFPhase(i,j,k) = sum / Cardinality;
+            }
+    
+    Dm->CommunicateMeshHalo(VFPhase);
+}*/
 
 
 void TwoPhase::UpdateMeshValues()
 {
     int i,j,k,n;
+    double fx,fy,fz;
+
+    // Make sure that SDn is communicated before use
+    for (k=1; k<Nz-1; k++)
+    for (j=1; j<Ny-1; j++)
+    for (i=1; i<Nx-1; i++){
+        fx = 0.5*(SDn(i+1,j,k) - SDn(i-1,j,k));
+        fy = 0.5*(SDn(i,j+1,k) - SDn(i,j-1,k));
+        fz = 0.5*(SDn(i,j,k+1) - SDn(i,j,k-1));
+        DelPhi(i,j,k) = sqrt(fx*fx+fy*fy+fz*fz);
+    }
+    Dm->CommunicateMeshHalo(DelPhi);
     
+    
+    Dm->CommunicateMeshHalo(SDn_tplus);
+    for (k=1; k<Nz-1; k++){
+        for (j=1; j<Ny-1; j++){
+            for (i=1; i<Nx-1; i++){
+                n = k*Nx*Ny+j*Nx+i;
+                dPdt(n) = SDn(n)-SDn_tplus(n);
+            }
+        }
+    }
+    Dm->CommunicateMeshHalo(dPdt);
+    //...........................................................................
+    pmmc_MeshGradient(SDn,SDn_x,SDn_y,SDn_z,Nx,Ny,Nz);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(SDn_x);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(SDn_y);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(SDn_z);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(Vel_x);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(Vel_y);
+    //...........................................................................
+    Dm->CommunicateMeshHalo(Vel_z);
+    //...........................................................................
     Dm->CommunicateMeshHalo(Press);
+
+
     
     Dm->CommunicateMeshHalo(SDn);
     
@@ -781,20 +1046,7 @@ void TwoPhase::UpdateMeshValues()
     Dm->CommunicateMeshHalo(MeanCurvature);
     //...........................................................................
     Dm->CommunicateMeshHalo(GaussCurvature);
-    
-    // Compute the gradients of the phase indicator and signed distance fields
-    pmmc_MeshGradient(SDn,SDn_x,SDn_y,SDn_z,Nx,Ny,Nz);
-    //...........................................................................
-    // Gradient of the phase indicator field
-    //...........................................................................
-    Dm->CommunicateMeshHalo(SDn_x);
-    //...........................................................................
-    Dm->CommunicateMeshHalo(SDn_y);
-    //...........................................................................
-    Dm->CommunicateMeshHalo(SDn_z);
-    //...........................................................................
-    
-    
+
     for (k=1; k<Nz-1; k++){
         for (j=1; j<Ny-1; j++){
             for (i=1; i<Nx-1; i++){
@@ -804,19 +1056,10 @@ void TwoPhase::UpdateMeshValues()
             }
         }
     }
+
     Dm->CommunicateMeshHalo(SDw_tplus);
     
     Dm->CommunicateMeshHalo(SDw);
-
-    //pmmc_MeshCurvature(SDw, MeanCurvatureW, GaussCurvatureW, Nx, Ny, Nz);
-    //...........................................................................
-    //Dm->CommunicateMeshHalo(MeanCurvatureW);
-    //...........................................................................
-    //Dm->CommunicateMeshHalo(GaussCurvatureW);
-
-    
-    Dm->CommunicateMeshHalo(DelPhi);
-    //...........................................................................
     //...........................................................................
     pmmc_MeshGradient(SDw,SDw_x,SDw_y,SDw_z,Nx,Ny,Nz);
     //...........................................................................
@@ -837,24 +1080,8 @@ void TwoPhase::UpdateMeshValues()
         else { normalw_z(n) = 0.0; }
 
     }
-    //...........................................................................
-    for (k=1; k<Nz-1; k++){
-        for (j=1; j<Ny-1; j++){
-            for (i=1; i<Nx-1; i++){
-                n = k*Nx*Ny+j*Nx+i;
-                dPdt(n) = (SDw_tplus(n) - SDw(n));
-            }
-        }
-    }
-    //...........................................................................
-    Dm->CommunicateMeshHalo(dPdt);
-    //...........................................................................
-    Dm->CommunicateMeshHalo(Vel_x);
-    //...........................................................................
-    Dm->CommunicateMeshHalo(Vel_y);
-    //...........................................................................
-    Dm->CommunicateMeshHalo(Vel_z);
 
+    //...........................................................................
 
     Dm->CommunicateMeshHalo(SDs);
     //...........................................................................
@@ -893,15 +1120,13 @@ void TwoPhase::UpdateMeshValues()
 }
 
 
-
-
-inline double normalEqnsExtrapolation(double y0, double y1, double dist) {}
+//inline double normalEqnsExtrapolation(double y0, double y1, double dist) {}
 
 
 void TwoPhase::FindIsolatedLatticeSites() {}
 
 
-void TwoPhase::ComputePhiDistance() {
+void TwoPhase::ComputePhiDistance(DoubleArray &Field) {
     double SqrtMagGradPhase = 0;
     int ijk;
     int strideY = Nx;
@@ -910,33 +1135,127 @@ void TwoPhase::ComputePhiDistance() {
     Array<char> id_solid(Nx,Ny,Nz);
 
     double factor,temp,value;
-           factor=0.5/0.9;
-       // Initialize to -1,1 (segmentation)
-       for (int k=0; k<Nz; k++){
-           for (int j=0; j<Ny; j++){
-               for (int i=0; i<Nx; i++){
-                   int n = k*Nx*Ny+j*Nx+i;
-                   double value = Phase(n);
-                   if (value > 0)    id_solid(n) = 1;
-                   else              id_solid(n) = 0;
-                   temp = factor*log((1.0+value)/(1.0-value));
-                   if (value > 0.8) Phase(n) = 2.94*factor;
-                   else if (value < -0.8) Phase(n) = -2.94*factor;
-                   else Phase(n) = temp;
-               }
-           }
-       }
+    factor=0.5/0.9;
+    // Initialize to -1,1 (segmentation)
+    for (int k=0; k<Nz; k++){
+        for (int j=0; j<Ny; j++){
+            for (int i=0; i<Nx; i++){
+                int n = k*Nx*Ny+j*Nx+i;
+                double value = Field(n);
+                if (value > 0)    id_solid(n) = 1;
+                else              id_solid(n) = 0;
+                temp = factor*log((1.0+value)/(1.0-value));
+                if (value > 0.8) Field(n) = 2.94*factor;
+                else if (value < -0.8) Field(n) = -2.94*factor;
+                else Field(n) = temp;
+            }
+        }
+    }
    
-    
-    CalcDist(Phase,id_solid,*Dm);
+    CalcDist(Field,id_solid,*Dm);
     
 }
 
-void TwoPhase::MeanFilter() {
+
+void TwoPhase::InactiveCellMeanFilter(DoubleArray &Field) {
+
+    DoubleArray SavedField; SavedField.resize(Nx,Ny,Nz); SavedField.fill(0);
+
+    double sf;
+    int ijk;
+    int strideY = Nx;
+    int strideZ = Nx*Ny;
+
+    for (int k=0; k < Nz; k++) {
+        for (int j=0; j < Ny; j++) {
+            for (int i=0; i < Nx; i++) {
+                ijk = i + j * strideY + k * strideZ;
+                SavedField(ijk) = Field(ijk);
+            }
+        }
+    }
+
+    int kmin=1; int kmax=Nz-1;
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == 0) kmin=1;
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == (Dm->nprocz()-1)) kmax=Nz-1; // for BCC test - should normally be -4
+
+    int nn;
+    for (int k=kmin; k < kmax; k++) {
+        for (int j=1; j < Ny-1; j++) {
+            for (int i=1; i < Nx-1; i++) {
+
+                ijk = i + j * strideY + k * strideZ;
+
+                //Field(ijk) = Field(ijk) * (1./3.);
+
+                if (VFmask(ijk) > 0.5 && VFmask(ijk) < 1.0) {
+
+                    nn = ijk-1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideZ;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideZ;
+                    Field(ijk) += (SavedField(nn) );
+
+                    nn = ijk-strideY-1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideY+1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideY-1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideY+1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideZ-1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideZ+1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideZ-1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideZ+1;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideZ-strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideZ+strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk+strideZ-strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    nn = ijk-strideZ+strideY;
+                    Field(ijk) += (SavedField(nn) );
+                    
+                    Field(ijk) /= 18.0;
+                }
+            }
+        }
+    }
+    Dm->CommunicateMeshHalo(Field);
+}
+
+void TwoPhase::MeanFilter(DoubleArray &Field) {
     
-    
-    DoubleArray SavedPhase; SavedPhase.resize(Nx,Ny,Nz); SavedPhase.fill(0);
-    
+    DoubleArray SavedField; SavedField.resize(Nx,Ny,Nz); SavedField.fill(0);
+
     double sf;
     int ijk;
     int strideY = Nx;
@@ -945,80 +1264,87 @@ void TwoPhase::MeanFilter() {
         for (int j=0; j < Ny; j++) {
             for (int i=0; i < Nx; i++) {
                 ijk = i + j * strideY + k * strideZ;
-                SavedPhase(ijk) = Phase(ijk);
+                SavedField(ijk) = Field(ijk);
             }
         }
     }
-    
+
+    int kmin=1; int kmax=Nz-1;
+
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == 0) kmin=1;
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == (Dm->nprocz()-1)) kmax=Nz-1; // for BCC test - should normally be -4
+
     int nn;
-    for (int k=1; k < Nz-1; k++) {
-            for (int j=1; j < Ny-1; j++) {
-                for (int i=1; i < Nx-1; i++) {
-                     ijk = i + j * strideY + k * strideZ;
 
-                        Phase(ijk) = Phase(ijk) * (1./3.);
+    for (int k=kmin; k < kmax; k++) {
+        for (int j=1; j < Ny-1; j++) {
+            for (int i=1; i < Nx-1; i++) {
 
-                        nn = ijk-1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
+                ijk = i + j * strideY + k * strideZ;
 
-                        nn = ijk+1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
+                Field(ijk) = Field(ijk) * (1./3.);
 
-                        nn = ijk-strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
+                nn = ijk-1;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk+strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
+                nn = ijk+1;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk-strideZ;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
+                nn = ijk-strideY;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk+strideZ;
-                        Phase(ijk) += (SavedPhase(nn) * (1./18.));
-                        nn = ijk-strideY-1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideY;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk+strideY+1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk-strideZ;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk+strideY-1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideZ;
+                Field(ijk) += (SavedField(nn) * (1./18.));
 
-                        nn = ijk-strideY+1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk-strideY-1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk-strideZ-1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideY+1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk+strideZ+1;
-                       Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideY-1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk+strideZ-1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk-strideY+1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk-strideZ+1;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk-strideZ-1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk-strideZ-strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideZ+1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk+strideZ+strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk+strideZ-1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk+strideZ-strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
+                nn = ijk-strideZ+1;
+                Field(ijk) += (SavedField(nn) * (1./36.));
 
-                        nn = ijk-strideZ+strideY;
-                        Phase(ijk) += (SavedPhase(nn) * (1./36.));
-                    
-                }
+                nn = ijk-strideZ-strideY;
+                Field(ijk) += (SavedField(nn) * (1./36.));
+
+                nn = ijk+strideZ+strideY;
+                Field(ijk) += (SavedField(nn) * (1./36.));
+
+                nn = ijk+strideZ-strideY;
+                Field(ijk) += (SavedField(nn) * (1./36.));
+
+                nn = ijk-strideZ+strideY;
+                Field(ijk) += (SavedField(nn) * (1./36.));
             }
+        }
     }
-        Dm->CommunicateMeshHalo(Phase);
+    Dm->CommunicateMeshHalo(Field);
 }
 
 
-void TwoPhase::ToBinary() {
+/*void TwoPhase::ToBinary(DoubleArray & Field) {
     int ijk;
     int strideY = Nx;
     int strideZ = Nx*Ny;
@@ -1026,20 +1352,20 @@ void TwoPhase::ToBinary() {
         for (int j=0; j < Ny; j++) {
             for (int i=0; i < Nx; i++) {
                 ijk = i + j * strideY + k * strideZ;
-                if ( Phase(ijk) == affinity) Phase(ijk) = -1;
-                if ( Phase(ijk) > 0) Phase(ijk) = 1;
-                if (Phase(ijk) <=0) Phase(ijk) = -1;
+                if ( Field(ijk) == affinity) Field(ijk) = -1;
+                if ( Field(ijk) > 0) Field(ijk) = 1;
+                if (Field(ijk) <= 0) Field(ijk) = -1;
             }
         }
     }
-}
+}*/
 
 
-void TwoPhase::ZeroSolidPhaseLatticeSites() {
+void TwoPhase::ZeroSolidPhaseLatticeSites(DoubleArray & Field) {
+
     int count;
     double vfs;
 
-    /* Determine the neighbor fluid phase fraction based upon neighbors */
     int strideY = Nx;
     int strideZ = Nx*Ny;
 
@@ -1048,31 +1374,39 @@ void TwoPhase::ZeroSolidPhaseLatticeSites() {
     double m0;
     int id;
 
-    Dm->CommunicateMeshHalo(TempPhase);
-
-    // D3Q19
-    double w0 =  1./3.; // 1./3.
-    double w1to6 = 1./18.;
-    double w7to19 =  1./36.;
-
-    double weight = 0;
-    double phi;
-
-    // Fills all inactive sites with first approximation
-    double y0,y1,y2,qdist;
-    double yprime;
     size_t N = Nx*Ny*Nz;
 
     for (int k=1; k < Nz-1; k++) {
-                for (int j=1; j < Ny-1; j++) {
-                    for (int i=1; i < Nx-1; i++) {
-                        ijk = i + j * strideY + k * strideZ;
-                        if (Phase(ijk) == affinity) Phase(ijk) = 0.0;
+        for (int j=1; j < Ny-1; j++) {
+            for (int i=1; i < Nx-1; i++) {
+                ijk = i + j * strideY + k * strideZ;
+                if (VFmask(ijk) == 1) {
+                    if (Field(ijk) == affinity) {
+                        Field(ijk) = affinity;
                     }
                 }
-          }
-    Dm->CommunicateMeshHalo(Phase);
+            }
+        }
+    }
+    Dm->CommunicateMeshHalo(Field);
 }
+
+/*void TwoPhase::SavePhaseIntoOldPhase(DoubleArray & NewField, DoubleArray & Field) {
+    
+    int ijk;
+    int strideY = Nx;
+    int strideZ = Nx*Ny;
+    for (int k=1; k < Nz-1; k++) {
+        for (int j=1; j < Ny-1; j++) {
+            for (int i=1; i < Nx-1; i++) {
+                ijk = i + j * strideY + k * strideZ;
+                NewField(ijk) = Field(ijk);
+            }
+        }
+    }
+    
+}*/
+
 
 // Done before analysis is performed to compute VFs 
 void TwoPhase::PhaseInit(double affinity)
@@ -1110,10 +1444,10 @@ void TwoPhase::PhaseInit(double affinity)
     double nx,ny,nz;
     
     DoubleArray nwOwnO_tmp(3);
-       DoubleArray nwOwsO_tmp(3);
-       DoubleArray nw_tmp(3);
-       DoubleArray wwn_tmp(3);
-       DoubleArray vwn_tmp(3), vwns_tmp(3), vws_tmp(3), vns_tmp(3), Gwn_tmp(6), Gws_tmp(6), Gns_tmp(6), Gwns_tmp(6);
+    DoubleArray nwOwsO_tmp(3);
+    DoubleArray nw_tmp(3);
+    DoubleArray wwn_tmp(3);
+    DoubleArray vnw_tmp(3), vnws_tmp(3), vws_tmp(3), vns_tmp(3), Gwn_tmp(6), Gws_tmp(6), Gns_tmp(6), Gwns_tmp(6);
     //size_t N = Nx*Ny*Nz;
     int ii,jj,kk;
     for (int ll = 0; ll < NSpheresOnRank; ll++) {
@@ -1190,9 +1524,7 @@ void TwoPhase::PhaseInit(double affinity)
                         /* Overwrite VFmask with volume fraction of solid phase */
                         VFmask(i,j,k) = CH_vol;
                         
-
                         vcg::tri::UpdateNormal<chMyMesh>::PerFaceNormalized(CH_ws);
-                        
                         
                         if (CH_vol >= 0.5 && CH_vol < 1) {
                             /* For visualization purposes */
@@ -1217,18 +1549,58 @@ void TwoPhase::PhaseInit(double affinity)
           }
       }
       
-      Dm->CommunicateMeshHalo(VFmask);
+    Dm->CommunicateMeshHalo(VFmask);
+
+    char LocalRankString[8];
+    char LocalExtension[8];
+    char LocalRankFilename[40];
+    sprintf(LocalRankString,"%05d",Dm->rank());
+    sprintf(LocalRankFilename,"%s%s%s","s_inactive_vis_data.",LocalRankString,".off");
+    vcg::tri::io::ExporterOFF<visMyMesh>::Save(vis_ws,LocalRankFilename, 1);
+    //        if (Dm->rank() == 0 ) { vcg::tri::io::ExporterOFF<visMyMesh>::Save(vis_ws,"s_vis_ws_data0.off", 1); }
+    //  if (Dm->rank() == 0 ) { vcg::tri::io::ExporterOFF<visMyMesh>::Save(vis_ns,"s_vis_ns_data0.off", 1); }
 }
+
+
+/*void TwoPhase::PrintPhaseI(DoubleArray & field) {
+    
+    ofstream file;
+    file.open ("phase_field_sample.txt");
+    for (int k = 1; k < Nz-1; k++)
+        for (int j = 1; j < Ny-1; j++)
+            for (int i = 1; i < Nx-1; i++) {
+                file << field(i,j,k) << " ";
+            }
+    file.close();
+    
+}*/
+
+
+/*void TwoPhase::PrintPhaseII(DoubleArray & field) {
+    
+    ofstream file;
+    file.open ("VF_field.txt");
+    for (int k = 1; k < Nz-1; k++)
+        for (int j = 1; j < Ny-1; j++)
+            for (int i = 1; i < Nx-1; i++) {
+                file << field(i,j,k) << " ";
+            }
+    file.close();
+    
+}*/
+
+
+//void TwoPhase::NonWettingPhaseVolume() {}
 
 
 void TwoPhase::FluidCentroidInit(double affinity){}
 
 
-
 void TwoPhase::InitializeRankSignDistance()
 {
-    numToAvg = 5;
     size_t N = Nx*Ny*Nz;
+    
+    // ! parallel plates
     rankSDs.resize(N*NSpheresOnRank); rankSDs.fill(0);
     ParticularSDs.resize(Nx,Ny,Nz); ParticularSDs.fill(0);
     
@@ -1236,299 +1608,16 @@ void TwoPhase::InitializeRankSignDistance()
     ParticularSDs_y.resize(Nx,Ny,Nz); ParticularSDs_y.fill(0);
     ParticularSDs_z.resize(Nx,Ny,Nz); ParticularSDs_z.fill(0);
     
-    InactiveCellFluidCenterOfMass.resize(3*N); InactiveCellFluidCenterOfMass.fill(0);
-    InactiveCellsActiveNeighborInterpolationAbscissa.resize(numToAvg*N); InactiveCellsActiveNeighborInterpolationAbscissa.fill(0);
-}
-void TwoPhase::RankSignDistance()
-{
-    int i,j,k;
-    
-    nwMyMesh m_nw;
-    nsMyMesh m_ns;
-    wsMyMesh m_ws;
-    
-    nMyMesh m_n;
-    sMyMesh m_s;
-    wMyMesh m_w;
-    
-    int strideY = Nx;
-     int strideZ = Nx*Ny;
-    
-    size_t N = Nx*Ny*Nz;
-    
-    int ncubes=(Nx-1)*(Ny-1)*(Nz-1);
-    int npx = Dm->nprocx();
-    int npy = Dm->nprocy();
-    int npz = Dm->nprocz();
-    //size_t fullncubes=npx*npy*npz*(Nx-1)*(Ny-1)*(Nz-1);
-    Point P,A,B,C;
-    Point Q,D,E,F;
-    Point R,G,H,I;
-    // Point S,J,K,L;
-    
-    
-    int total_ranks = Dm->nprocz() * Dm->nprocy() * Dm->nprocx();
-    
-    const int cube[8][3] = {{0,0,0},{1,0,0},{0,1,0},{1,1,0},{0,0,1},{1,0,1},{0,1,1},{1,1,1}};
-    
-    // If external boundary conditions are set, do not average over the inlet
-    int kmin=1; int kmax=Nz-1;
-    if (Dm->BoundaryCondition > 0 && Dm->kproc() == 0) kmin=4;
-    if (Dm->BoundaryCondition > 0 && Dm->kproc() == Dm->nprocz()-1) kmax=Nz-4;
-    
-    double dummy = 0;
-    const int N2x = ( Nx-2 ) / subdivide[0];
-    const int N2y = ( Ny-2 ) / subdivide[1];
-    const int N2z = ( kmax - kmin ) / subdivide[2];
-    
-    subNodeVolume = 1.0*(N2x*N2y*N2z);
-    
-    size_t wsFacesCount = 0;
-    size_t nfaces,nvertices;
-    nfaces = nvertices = 0;
-    
-    size_t nsFacesCount = 0;
-    size_t nsnfaces,nsnvertices;
-    nsnfaces = nsnvertices = 0;
-    
-    double total_mass = 0;
-    
-    double minJwn = 1E16;
-    double maxJwn = -1E16;
-    DoubleArray nwOwnO_tmp(3);
-    DoubleArray nwOwsO_tmp(3);
-    DoubleArray nw_tmp(3);
-    DoubleArray wwn_tmp(3);
-    DoubleArray vwn_tmp(3), vwns_tmp(3), vws_tmp(3), vns_tmp(3),
-    Gwn_tmp(6), Gws_tmp(6), Gns_tmp(6), Gwns_tmp(6);
-    // std::cout << Dm->rank() << ") ** NSpheresOnRank=" << NSpheresOnRank << std::endl;
-    MPI_Barrier(Dm->Comm);
-    
-    
-    int ii,jj,kk;
-    for (int ll = 0; ll < NSpheresOnRank; ll++) {
-    
-        for (int h = 0; h < N; h++) {
-            kk = h/(Nx*Ny); jj = (h-Nx*Ny*kk)/Nx; ii = h-Nx*Ny*kk-Nx*jj;
-            ParticularSDs(ii,jj,kk) = rankSDs(h + ll*N);
-        }
-    
-        for (int k=kmin; k<kmax; k++) { // kmin kmax
-            const int k2 = std::min<int>( ( k - kmin) / N2z, subdivide[2] - 1 );  // kmin
-            for (int j=1; j<Ny-1; j++){
-                const int j2 = std::min<int>( ( j - 1 ) / N2y, subdivide[1] - 1 );
-                for (int i=1; i<Nx-1; i++) {
-                    const int i2 = std::min<int>( ( i - 1 ) / N2x, subdivide[0] - 1 );
-                    vwn_tmp.fill( 0 );  vws_tmp.fill( 0 );  vns_tmp.fill( 0 );  vwns_tmp.fill( 0 );
-                    Gwn_tmp.fill( 0 );  Gws_tmp.fill( 0 );  Gns_tmp.fill( 0 );  Gwns_tmp.fill( 0 );
-                    wwn_tmp.fill( 0 ); nwOwnO_tmp.fill( 0 ); nwOwsO_tmp.fill( 0 );
+    SDn_tplus.resize(Nx,Ny,Nz);           SDn_tplus.fill(0);
+    SDn_tplusplus.resize(Nx,Ny,Nz);       SDn_tplusplus.fill(0);
 
-                    // Compute volume averages
-                    int n = i + j*Nx + k*Nx*Ny;
-
-
-                    //...........................................................................
-                    n_nw_pts=n_ns_pts=n_ws_pts=n_nws_pts=n_local_sol_pts=n_local_nws_pts=0;
-                    n_nw_tris=n_ns_tris=n_ws_tris=n_nws_seg=n_local_sol_tris=0;
-                    //...........................................................................
-                    pmmc_ConstructLocalCube(ParticularSDs, SDw, solid_isovalue, fluid_isovalue,
-                                            nw_pts, nw_tris, Values, ns_pts, ns_tris, ws_pts, ws_tris,
-                                            local_nws_pts, nws_pts, nws_seg, local_sol_pts, local_sol_tris,
-                                            n_local_sol_tris, n_local_sol_pts, n_nw_pts, n_nw_tris,
-                                            n_ws_pts, n_ws_tris, n_ns_tris, n_ns_pts, n_local_nws_pts, n_nws_pts, n_nws_seg,
-                                            i, j, k, Nx, Ny, Nz);
-                    //.......................................................................................
-                    if (n_nw_tris > 0) {
-                        for (int r=0;r<n_nw_tris;r++) {
-                            A = nw_pts(nw_tris(0,r));
-                            B = nw_pts(nw_tris(1,r));
-                            C = nw_pts(nw_tris(2,r));
-
-
-                            double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
-                            double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
-                            double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
-
-                            double normal_x = SDw_x(i,j,k);
-                            double normal_y = SDw_y(i,j,k);
-                            double normal_z = SDw_z(i,j,k);
-
-                            if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
-                                P = A;
-                                A = C;
-                                C = P;
-                            }
-
-                            // Remap the points
-                            A.x += 1.0*Dm->iproc()*(Nx-2);
-                            A.y += 1.0*Dm->jproc()*(Nx-2);
-                            A.z += 1.0*Dm->kproc()*(Nx-2);
-                            B.x += 1.0*Dm->iproc()*(Nx-2);
-                            B.y += 1.0*Dm->jproc()*(Nx-2);
-                            B.z += 1.0*Dm->kproc()*(Nx-2);
-                            C.x += 1.0*Dm->iproc()*(Nx-2);
-                            C.y += 1.0*Dm->jproc()*(Nx-2);
-                            C.z += 1.0*Dm->kproc()*(Nx-2);
-                            nwMyMesh::FaceIterator fi = vcg::tri::Allocator<nwMyMesh>::AddFace(m_nw,nwMyMesh::CoordType ( A.x, A.y, A.z),nwMyMesh::CoordType ( B.x, B.y, B.z),nwMyMesh::CoordType ( C.x, C.y, C.z));
-
-                        }
-                    }
-                    if (n_ws_tris > 0) {
-                        for (int r=0;r<n_ws_tris;r++){
-                            A = ws_pts(ws_tris(0,r));
-                            B = ws_pts(ws_tris(1,r));
-                            C = ws_pts(ws_tris(2,r));
-
-                            double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
-                            double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
-                            double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
-
-                            double normal_x = SDs_x(i,j,k);
-                            double normal_y = SDs_y(i,j,k);
-                            double normal_z = SDs_z(i,j,k);
-
-                            if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
-                                P = A;
-                                A = C;
-                                C = P;
-                            }
-
-                            // Remap the points
-                            A.x += 1.0*Dm->iproc()*(Nx-2);
-                            A.y += 1.0*Dm->jproc()*(Nx-2);
-                            A.z += 1.0*Dm->kproc()*(Nx-2);
-                            B.x += 1.0*Dm->iproc()*(Nx-2);
-                            B.y += 1.0*Dm->jproc()*(Nx-2);
-                            B.z += 1.0*Dm->kproc()*(Nx-2);
-                            C.x += 1.0*Dm->iproc()*(Nx-2);
-                            C.y += 1.0*Dm->jproc()*(Nx-2);
-                            C.z += 1.0*Dm->kproc()*(Nx-2);
-                            wsMyMesh::FaceIterator fi = vcg::tri::Allocator<wsMyMesh>::AddFace(m_ws,wsMyMesh::CoordType ( A.x, A.y, A.z),wsMyMesh::CoordType ( B.x, B.y, B.z),wsMyMesh::CoordType ( C.x, C.y, C.z));
-
-
-                        }
-                    }
-                    if (n_ns_tris > 0 ) {
-                        for (int r=0;r<n_ns_tris;r++){
-                            A = ns_pts(ns_tris(0,r));
-                            B = ns_pts(ns_tris(1,r));
-                            C = ns_pts(ns_tris(2,r));
-
-                            double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
-                            double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
-                            double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
-
-                            double normal_x = SDs_x(i,j,k);
-                            double normal_y = SDs_y(i,j,k);
-                            double normal_z = SDs_z(i,j,k);
-
-
-                            if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
-                                P = A;
-                                A = C;
-                                C = P;
-                            }
-
-                            // Remap the points
-                            A.x += 1.0*Dm->iproc()*(Nx-2);
-                            A.y += 1.0*Dm->jproc()*(Nx-2);
-                            A.z += 1.0*Dm->kproc()*(Nx-2);
-                            B.x += 1.0*Dm->iproc()*(Nx-2);
-                            B.y += 1.0*Dm->jproc()*(Nx-2);
-                            B.z += 1.0*Dm->kproc()*(Nx-2);
-                            C.x += 1.0*Dm->iproc()*(Nx-2);
-                            C.y += 1.0*Dm->jproc()*(Nx-2);
-                            C.z += 1.0*Dm->kproc()*(Nx-2);
-                            nsMyMesh::FaceIterator fi = vcg::tri::Allocator<nsMyMesh>::AddFace(m_ns,nsMyMesh::CoordType ( A.x, A.y, A.z),nsMyMesh::CoordType ( B.x, B.y, B.z),nsMyMesh::CoordType ( C.x, C.y, C.z));
-
-                        }
-                    }
-
-
-                    // wn interface averages
-                    if ( n_nw_tris >0 ) {
-
-                        double value = pmmc_CubeSurfaceOrientation(Gwn_tmp,nw_pts,nw_tris,n_nw_tris);    // computes normal vector, triangle area, and orientation tensor
-                        for (int m=0; m<6; m++)  Gwn_sub(i2,j2,k2,m) += Gwn_tmp(m);
-
-                        pwn_sub(i2,j2,k2) += pmmc_CubeSurfaceInterpValue(CubeValues,Press,nw_pts,nw_tris,Values,i,j,k,n_nw_pts,n_nw_tris);
-
-                        // Compute the normal speed of the interface
-                        Eta_sub(i2,j2,k2) += pmmc_InterfaceSpeed(dPdt, SDw_x, SDw_y, SDw_z, CubeValues, nw_pts, nw_tris, NormalVector, InterfaceSpeed, wwn_tmp, i, j, k, n_nw_pts, n_nw_tris);
-
-                        wwn_sub(i2,j2,k2,0) += wwn_tmp(0);
-                        wwn_sub(i2,j2,k2,1) += wwn_tmp(1);
-                        wwn_sub(i2,j2,k2,2) += wwn_tmp(2);
-
-
-                        //euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(nw_pts,nw_tris,n_nw_pts,n_nw_tris,i,j,k);
-                    }
-                    // wns common curve averages
-                    if ( n_local_nws_pts > 0 ) { // && LabelNWP >=0 && LabelWP >=0){
-                        efawns_sub(i2,j2,k2) += pmmc_CubeContactAngle(CubeValues,Values,SDn_x,SDn_y,SDn_z,SDs_x,SDs_y,SDs_z,local_nws_pts,i,j,k,n_local_nws_pts);
-
-                        wwnsdnwn_sub(i2,j2,k2) += pmmc_CommonCurveSpeed(CubeValues, dPdt, vwns_tmp, SDn_x, SDn_y, SDn_z,SDs_x,SDs_y,SDs_z, local_nws_pts,i,j,k,n_local_nws_pts);
-                        vwns_sub(i2,j2,k2,0) += vwns_tmp(0);
-                        vwns_sub(i2,j2,k2,1) += vwns_tmp(1);
-                        vwns_sub(i2,j2,k2,2) += vwns_tmp(2);
-
-                        pmmc_CurveCurvature(SDn, SDs, SDn_x, SDn_y, SDn_z, SDs_x, SDs_y,
-                                            SDs_z, KNwns_values, KGwns_values, KNwns, KGwns,
-                                            nws_pts, n_nws_pts, i, j, k);
-                        KNwns_sub(i2,j2,k2) += KNwns;
-                        KGwns_sub(i2,j2,k2) += KGwns;
-                        lwns_sub(i2,j2,k2) +=  pmmc_CubeCurveLength(local_nws_pts,n_local_nws_pts); // add Gwns functionality to CubeCurveLength
-                        pmmc_CurveOrientation(Gwns_tmp,local_nws_pts,n_local_nws_pts,i,j,k);
-                        for (int m=0; m<6; m++)  Gwns_sub(i2,j2,k2,m) += Gwns_tmp(m);
-                    }
-
-
-                    if (n_ws_tris > 0) {
-                        aws_sub(i2,j2,k2) += pmmc_CubeSurfaceOrientation(Gws_tmp,ws_pts,ws_tris,n_ws_tris);
-                        for (int m=0; m<6; m++) { Gws_sub(i2,j2,k2,m) += Gws_tmp(m); }
-                        aws_sub(i2,j2,k2) += pmmc_CubeSurfaceNormalVector(nwOwsO_tmp,ws_pts,ws_tris,n_ws_tris);    // computes normal vector, triangle area, and orientation tensor
-                        for (int m=0; m<3; m++)  nwOwsO_sub(i2,j2,k2,m) += nwOwsO_tmp(m);
-                        pmmc_InterfaceSpeed(dPdt, SDw_x, SDw_y, SDw_z, CubeValues, ws_pts, ws_tris, NormalVector, InterfaceSpeed, vws_tmp, i, j, k, n_ws_pts, n_ws_tris);
-                        vws_sub(i2,j2,k2,0) += vws_tmp(0);
-                        vws_sub(i2,j2,k2,1) += vws_tmp(1);
-                        vws_sub(i2,j2,k2,2) += vws_tmp(2);
-
-                        euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(ws_pts,ws_tris,n_ws_pts,n_ws_tris,i,j,k);
-
-                    }
-                    if (n_ns_tris > 0) {
-                        ans_sub(i2,j2,k2) += pmmc_CubeSurfaceOrientation(Gns_tmp,ns_pts,ns_tris,n_ns_tris);
-                        for (int m=0; m<6; m++) {  Gns_sub(i2,j2,k2,m) += Gns_tmp(m); }
-                        pmmc_InterfaceSpeed(dPdt, SDn_x, SDn_y, SDn_z,  CubeValues, ns_pts,ns_tris, NormalVector, InterfaceSpeed, vns_tmp, i, j, k, n_ns_pts, n_ns_tris);
-                        vns_sub(i2,j2,k2,0) += vns_tmp(0);
-                        vns_sub(i2,j2,k2,1) += vns_tmp(1);
-                        vns_sub(i2,j2,k2,2) += vns_tmp(2);
-
-                        euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(ns_pts,ns_tris,n_ns_pts,n_ns_tris,i,j,k);
-                    }
-                }
-            }
-        }
-    }
-    MPI_Barrier(Dm->Comm);
-    
-    
-    aws_sub.fill(0);
-    ans_sub.fill(0);
-    awn_sub.fill(0);
-    
-    
-    wsComputeQuantities(m_ws);
-    nsComputeQuantities(m_ns);
 }
 
 
-
+void TwoPhase::RankSignDistance() {}
 void TwoPhase::CuttingPlaneZ(int zval) {}
 
-
-
-
+double MySqr(double a_fVal) {  return a_fVal*a_fVal; }
 
 void TwoPhase::ComputeLocal()
 {
@@ -1544,19 +1633,18 @@ void TwoPhase::ComputeLocal()
     wMyMesh m_w;
     
     int strideY = Nx;
-     int strideZ = Nx*Ny;
+    int strideZ = Nx*Ny;
     
-    
+    //size_t fullncubes=npx*npy*npz*(Nx-1)*(Ny-1)*(Nz-1);
     int ncubes=(Nx-1)*(Ny-1)*(Nz-1);
     int npx = Dm->nprocx();
     int npy = Dm->nprocy();
     int npz = Dm->nprocz();
-    //size_t fullncubes=npx*npy*npz*(Nx-1)*(Ny-1)*(Nz-1);
+
     Point P,A,B,C;
     Point Q,D,E,F;
     Point R,G,H,I;
     // Point S,J,K,L;
-    
     
     int total_ranks = Dm->nprocz() * Dm->nprocy() * Dm->nprocx();
     
@@ -1564,8 +1652,8 @@ void TwoPhase::ComputeLocal()
     
     // If external boundary conditions are set, do not average over the inlet
     int kmin=1; int kmax=Nz-1;
-    if (Dm->BoundaryCondition > 0 && Dm->kproc() == 0) kmin=4;
-    if (Dm->BoundaryCondition > 0 && Dm->kproc() == Dm->nprocz()-1) kmax=Nz-4;
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == 0) kmin=7;
+    if (Dm->BoundaryCondition > 0 && Dm->kproc() == Dm->nprocz()-1) kmax=Nz-7;
     
     double dummy = 0;
     const int N2x = ( Nx-2 ) / subdivide[0];
@@ -1583,6 +1671,8 @@ void TwoPhase::ComputeLocal()
     nsnfaces = nsnvertices = 0;
     
     double total_mass = 0;
+
+    double WPHASEWALL = 1E-16;
     
     double minJwn = 1E16;
     double maxJwn = -1E16;
@@ -1590,17 +1680,18 @@ void TwoPhase::ComputeLocal()
     DoubleArray nwOwsO_tmp(3);
     DoubleArray nw_tmp(3);
     DoubleArray wwn_tmp(3);
-    DoubleArray vwn_tmp(3), vwns_tmp(3), vws_tmp(3), vns_tmp(3), Gwn_tmp(6), Gws_tmp(6), Gns_tmp(6), Gwns_tmp(6);
+    DoubleArray vnw_tmp(3), vnws_tmp(3), vws_tmp(3), vns_tmp(3), Gwn_tmp(6), Gws_tmp(6), Gns_tmp(6), Gwns_tmp(6);
     
     size_t N = Nx*Ny*Nz;
     int ii,jj,kk;
+
     for (int ll = 0; ll < NSpheresOnRank; ll++) {
         for (int h = 0; h < N; h++) {
             kk = h/(Nx*Ny); jj = (h-Nx*Ny*kk)/Nx; ii = h-Nx*Ny*kk-Nx*jj;
             ParticularSDs(ii,jj,kk) = rankSDs(h + ll*N);
         }
-         pmmc_MeshGradient(ParticularSDs,ParticularSDs_x,ParticularSDs_y,ParticularSDs_z,Nx,Ny,Nz);
-        for (k=kmin; k<kmax; k++){
+        
+        for (k=1; k<Nz-1; k++){
             for (j=1; j<Ny-1; j++){
                 for (i=1; i<Nx-1; i++){
                     // Compute all of the derivatives using finite differences
@@ -1611,26 +1702,19 @@ void TwoPhase::ComputeLocal()
             }
         }
             
-            
-            
-        
-        for (int k=kmin; k<kmax; k++) { // kmin kmax
+        for (int k=kmin; k<kmax; k++) { 
             const int k2 = std::min<int>( ( k - kmin) / N2z, subdivide[2] - 1 );  // kmin
             for (int j=1; j<Ny-1; j++){
                 const int j2 = std::min<int>( ( j - 1 ) / N2y, subdivide[1] - 1 );
                 for (int i=1; i<Nx-1; i++) {
                     const int i2 = std::min<int>( ( i - 1 ) / N2x, subdivide[0] - 1 );
                     
-                    vwn_tmp.fill( 0 );  vws_tmp.fill( 0 );  vns_tmp.fill( 0 );  vwns_tmp.fill( 0 );
+                    vnw_tmp.fill( 0 );  vws_tmp.fill( 0 );  vns_tmp.fill( 0 );  vnws_tmp.fill( 0 );
                     Gwn_tmp.fill( 0 );  Gws_tmp.fill( 0 );  Gns_tmp.fill( 0 );  Gwns_tmp.fill( 0 );
                     wwn_tmp.fill( 0 ); nwOwnO_tmp.fill( 0 ); nwOwsO_tmp.fill( 0 );
                     
                     // Compute volume averages
                     int n = i + j*Nx + k*Nx*Ny;
-                    double vs = VFmask(n);
-                    double vf = 1.0 - vs;
-                    double phase_val = Phase(n);
-                    char id_val = Dm->id[n];
                     
                     //...........................................................................
                     n_nw_pts=n_ns_pts=n_ws_pts=n_nws_pts=n_local_sol_pts=n_local_nws_pts=0;
@@ -1678,9 +1762,6 @@ void TwoPhase::ComputeLocal()
                         }
                     }
                     if (n_ns_tris > 0 ) {
-                        nsFacesCount++;
-                        nsnfaces += n_ns_tris;
-                        nsnvertices += n_ns_pts;
                         for (int r=0;r<n_ns_tris;r++) {
                             A = ns_pts(ns_tris(0,r));
                             B = ns_pts(ns_tris(1,r));
@@ -1714,24 +1795,49 @@ void TwoPhase::ComputeLocal()
 
                         }
                     }
+                    if (n_nw_tris > 0) {
+                        for (int r=0;r<n_nw_tris;r++) {
+                            A = nw_pts(nw_tris(0,r));
+                            B = nw_pts(nw_tris(1,r));
+                            C = nw_pts(nw_tris(2,r));
+                            
+                            double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
+                            double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
+                            double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
+                            
+                            double normal_x = -SDn_x(i,j,k);
+                            double normal_y = -SDn_y(i,j,k);
+                            double normal_z = -SDn_z(i,j,k);
+                            
+                            if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
+                                P = A;
+                                A = C;
+                                C = P;
+                            }
+                            
+                            // Remap the points
+                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                            nwMyMesh::FaceIterator fi = vcg::tri::Allocator<nwMyMesh>::AddFace(m_nw,nwMyMesh::CoordType ( A.x, A.y, A.z),nwMyMesh::CoordType ( B.x, B.y, B.z),nwMyMesh::CoordType ( C.x, C.y, C.z));
+                        }
+                    }                    
                     
-                    
-                    
-                  
                     // wns common curve averages
                     if ( n_local_nws_pts > 0 ) {
-                        efawns_sub(i2,j2,k2) += pmmc_CubeContactAngle(CubeValues,Values,
-                                                                      SDn_x,SDn_y,SDn_z,
-                                                                      ParticularSDs_x,ParticularSDs_y,ParticularSDs_z,
-                                                                      local_nws_pts,i,j,k,n_local_nws_pts);
-
-                        wwnsdnwn_sub(i2,j2,k2) += pmmc_CommonCurveSpeed(CubeValues, dPdt, vwns_tmp,
+                        wwnsdnwn_sub(i2,j2,k2) += pmmc_CommonCurveSpeed(CubeValues, dPdt, vnws_tmp,
                                                                         SDn_x, SDn_y, SDn_z,
                                                                         ParticularSDs_x,ParticularSDs_y,ParticularSDs_z,
                                                                         local_nws_pts,i,j,k,n_local_nws_pts);
-                        vwns_sub(i2,j2,k2,0) += vwns_tmp(0);
-                        vwns_sub(i2,j2,k2,1) += vwns_tmp(1);
-                        vwns_sub(i2,j2,k2,2) += vwns_tmp(2);
+                        vnws_sub(i2,j2,k2,0) += vnws_tmp(0);
+                        vnws_sub(i2,j2,k2,1) += vnws_tmp(1);
+                        vnws_sub(i2,j2,k2,2) += vnws_tmp(2);
 
                         pmmc_CurveCurvature(SDn, ParticularSDs,
                                             SDn_x, SDn_y, SDn_z,
@@ -1748,14 +1854,13 @@ void TwoPhase::ComputeLocal()
                     if (n_ws_tris > 0) {
                         aws_sub(i2,j2,k2) += pmmc_CubeSurfaceOrientation(Gws_tmp,ws_pts,ws_tris,n_ws_tris);
                         for (int m=0; m<6; m++) { Gws_sub(i2,j2,k2,m) += Gws_tmp(m); }
-                        aws_sub(i2,j2,k2) += pmmc_CubeSurfaceNormalVector(nwOwsO_tmp,ws_pts,ws_tris,n_ws_tris);
-                        for (int m=0; m<3; m++)  nwOwsO_sub(i2,j2,k2,m) += nwOwsO_tmp(m);
-                        pmmc_InterfaceSpeed(dPdt, SDw_x, SDw_y, SDw_z, CubeValues, ws_pts, ws_tris, NormalVector, InterfaceSpeed, vws_tmp, i, j, k, n_ws_pts, n_ws_tris);
+                        //aws_sub(i2,j2,k2) += pmmc_CubeSurfaceNormalVector(nwOwsO_tmp,ws_pts,ws_tris,n_ws_tris);
+                        //for (int m=0; m<3; m++)  nwOwsO_sub(i2,j2,k2,m) += nwOwsO_tmp(m);
+                        pmmc_InterfaceSpeed(dPdt, SDn_x, SDn_y, SDn_z, CubeValues, ws_pts, ws_tris, NormalVector, InterfaceSpeed, vws_tmp, i, j, k, n_ws_pts, n_ws_tris);
+                        
                         vws_sub(i2,j2,k2,0) += vws_tmp(0);
                         vws_sub(i2,j2,k2,1) += vws_tmp(1);
                         vws_sub(i2,j2,k2,2) += vws_tmp(2);
-
-                        //euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(ws_pts,ws_tris,n_ws_pts,n_ws_tris,i,j,k);
 
                     }
                     if (n_ns_tris > 0) {
@@ -1766,13 +1871,242 @@ void TwoPhase::ComputeLocal()
                         vns_sub(i2,j2,k2,1) += vns_tmp(1);
                         vns_sub(i2,j2,k2,2) += vns_tmp(2);
 
-                        //euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(ns_pts,ns_tris,n_ns_pts,n_ns_tris,i,j,k);
+                        euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(ns_pts,ns_tris,n_ns_pts,n_ns_tris,i,j,k);
                     }
-                    euler_sub += geomavg_EulerCharacteristic(nw_pts,nw_tris,n_nw_pts,n_nw_tris,i,j,k);
+                    if (n_nw_tris > 0) {
+                        
+                        euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(nw_pts,nw_tris,n_nw_pts,n_nw_tris,i,j,k);
+                        
+                        pmmc_InterfaceSpeed(dPdt, SDn_x, SDn_y, SDn_z, CubeValues, nw_pts, nw_tris, NormalVector, InterfaceSpeed, vnw_tmp, i, j, k, n_nw_pts, n_nw_tris);
+                        
+                        vnw_sub(i2,j2,k2,0) += vnw_tmp(0);
+                        vnw_sub(i2,j2,k2,1) += vnw_tmp(1);
+                        vnw_sub(i2,j2,k2,2) += vnw_tmp(2);
+                    }
+                    if (n_nws_seg > 0) {
+                        for (int r = 0; r < n_nws_seg; r++) {
+                            nwsMyMesh m_nws;
+                            Q = nws_pts(nws_seg(0,r));
+                            R = nws_pts(nws_seg(1,r));
+                            if (n_ns_tris > 0 ) {
+                                for (int r=0;r<n_ns_tris;r++) {
+                                    A = ns_pts(ns_tris(0,r));
+                                    B = ns_pts(ns_tris(1,r));
+                                    C = ns_pts(ns_tris(2,r));
+                                    
+                                    double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
+                                    double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
+                                    double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
+                                    
+                                    double normal_x = ParticularSDs_x(i,j,k);
+                                    double normal_y = ParticularSDs_y(i,j,k);
+                                    double normal_z = ParticularSDs_z(i,j,k);
+                                    
+                                    if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
+                                        P = A;
+                                        A = C;
+                                        C = P;
+                                    }
+                                    
+                                    if (Q == A) {
+                                        if (R == B) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == C) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                    if (Q == B) {
+                                        if (R == A) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == C) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                    if (Q == C) {
+                                        if (R == B) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == A) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                }
+                            }
+                            if (n_nw_tris > 0 ) {
+                                for (int r=0;r<n_nw_tris;r++) {
+                                    A = nw_pts(nw_tris(0,r));
+                                    B = nw_pts(nw_tris(1,r));
+                                    C = nw_pts(nw_tris(2,r));
+                                    
+                                    double tri_normal_x = (A.y-B.y)*(B.z-C.z) - (A.z-B.z)*(B.y-C.y);
+                                    double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
+                                    double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
+                                    
+                                    double normal_x = -SDn_x(i,j,k);
+                                    double normal_y = -SDn_y(i,j,k);
+                                    double normal_z = -SDn_z(i,j,k);
+                                    
+                                    if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
+                                        P = A;
+                                        A = C;
+                                        C = P;
+                                    }
+                                    if (Q == A) {
+                                        if (R == B) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == C) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                    if (Q == B) {
+                                        if (R == A) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == C) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                    if (Q == C) {
+                                        if (R == B) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                        if (R == A) {
+                                            A.x += 1.0*Dm->iproc()*(Nx-2);
+                                            A.y += 1.0*Dm->jproc()*(Nx-2);
+                                            A.z += 1.0*Dm->kproc()*(Nx-2);
+                                            B.x += 1.0*Dm->iproc()*(Nx-2);
+                                            B.y += 1.0*Dm->jproc()*(Nx-2);
+                                            B.z += 1.0*Dm->kproc()*(Nx-2);
+                                            C.x += 1.0*Dm->iproc()*(Nx-2);
+                                            C.y += 1.0*Dm->jproc()*(Nx-2);
+                                            C.z += 1.0*Dm->kproc()*(Nx-2);
+                                            nwsMyMesh::FaceIterator fi = vcg::tri::Allocator<nwsMyMesh>::AddFace(m_nws,nwsMyMesh::CoordType ( A.x, A.y, A.z),nwsMyMesh::CoordType ( B.x, B.y, B.z),nwsMyMesh::CoordType ( C.x, C.y, C.z));
+                                        }
+                                    }
+                                }
+                            }
+                            nwsComputeQuantities(m_nws);
+                        }
+                    }
+                    // wn interface averages
                 }
             }
         }
     }
+    
+    aws_sub.fill(0);
+    ans_sub.fill(0);
+    wsComputeQuantities(m_ws);
+    nsComputeQuantities(m_ns);
+    awn_sub.fill(0);
+    nwComputeQuantities(m_nw);
+    
+    
+    if (efawns_count == 0) efawns_count = 1;
+    if (efawns > 0) { efawns /= double(efawns_count); efawns = 180.0 - efawns; } // if phase affinity < 0
+
     
     for (int k=kmin; k<kmax; k++) {
         const int k2 = std::min<int>( ( k - kmin) / N2z, subdivide[2] - 1 );
@@ -1780,57 +2114,97 @@ void TwoPhase::ComputeLocal()
             const int j2 = std::min<int>( ( j - 1 ) / N2y, subdivide[1] - 1 );
             for (int i=1; i<Nx-1; i++) {
                 const int i2 = std::min<int>( ( i - 1 ) / N2x, subdivide[0] - 1 );
-                vwn_tmp.fill( 0 );  vws_tmp.fill( 0 );  vns_tmp.fill( 0 );  vwns_tmp.fill( 0 );
+                vnw_tmp.fill( 0 );  vws_tmp.fill( 0 );  vns_tmp.fill( 0 );  vnws_tmp.fill( 0 );
                 Gwn_tmp.fill( 0 );  Gws_tmp.fill( 0 );  Gns_tmp.fill( 0 );  Gwns_tmp.fill( 0 );
                 wwn_tmp.fill( 0 ); nwOwnO_tmp.fill( 0 ); nwOwsO_tmp.fill( 0 );
                 
                 // Compute volume averages
                 int n = i + j*Nx + k*Nx*Ny;
-                double vs = VFmask(n);  double vf = 1.0 - vs;
-                double phase_val = Phase(n);  double delPhi_val = DelPhi(n);
+                double vs = VFmask(n);  
+                double vf = 1.0 - vs;
+                double phase_val = SDn(n);  
+                double delPhi_val = DelPhi(n);
                 char id_val = Dm->id[n];
-                
-                if (vf > 0) {
+
+                if (vf == 1.0) {
                     if ( phase_val > 0 ) {
-                        nwp_volume_sub(i2,j2,k2) += vf;
-                        an_sub(i2,j2,k2) += vf;
-                    }
-                    else {
-                        wp_volume_sub(i2,j2,k2) += vf;
-                        aw_sub(i2,j2,k2) += vf;
-                    }
-                }
-                
-                if (vf > 0 && id_val != 0) {
-                    if ( phase_val > 0 ) {
-                        vn_sub(i2,j2,k2,0) += (Vel_x(n));
-                        vn_sub(i2,j2,k2,1) += (Vel_y(n));
-                        vn_sub(i2,j2,k2,2) += (Vel_z(n));
-                        if (delPhi_val > 1e-4){
-                            vol_n_sub(i2,j2,k2) += vf;
-                            pn_sub(i2,j2,k2) += (Press(n));
+                        nwp_volume_sub(i2,j2,k2) += 1.0;
+                        an_sub(i2,j2,k2) += 1.0;
+                        // velocity
+                        vn_sub(i2,j2,k2,0) += Vel_x(n);
+                        vn_sub(i2,j2,k2,1) += Vel_y(n);
+                        vn_sub(i2,j2,k2,2) += Vel_z(n);
+                        if (delPhi_val < 1e-4){
+                            vol_n_sub(i2,j2,k2) += 1.0;
+                            pn_sub(i2,j2,k2) += Press(n);
                         }
                     }
                     else {
-                        vw_sub(i2,j2,k2,0) += (Vel_x(n));
-                        vw_sub(i2,j2,k2,1) += (Vel_y(n));
-                        vw_sub(i2,j2,k2,2) += (Vel_z(n));
-                        if (delPhi_val > 1e-4){
-                            vol_w_sub(i2,j2,k2) += vf;
-                            pw_sub(i2,j2,k2) += (Press(n));
+                        wp_volume_sub(i2,j2,k2) += 1.0;
+                        aw_sub(i2,j2,k2) += 1.0;
+                        // velocity
+                        vw_sub(i2,j2,k2,0) += Vel_x(n);
+                        vw_sub(i2,j2,k2,1) += Vel_y(n);
+                        vw_sub(i2,j2,k2,2) += Vel_z(n);
+                        if (delPhi_val < 1e-4){
+                            vol_w_sub(i2,j2,k2) += 1.0;
+                            pw_sub(i2,j2,k2) += Press(n);
+                        }
+                    } 
+                }
+                if (vf < 1.0 && vf > 0.0) {
+                    /* Add to the overall volume */
+                    if (id_val == 0) { // inactive lattice site
+                        if ( phase_val > 0 ) {
+                            nwp_volume_sub(i2,j2,k2) += vf;
+                            an_sub(i2,j2,k2) += vf;
+                            if (delPhi_val < 1e-4) {
+                                vol_n_sub(i2,j2,k2) += vf;
+                            }
+                        }
+                        else {
+                            wp_volume_sub(i2,j2,k2) += vf;
+                            aw_sub(i2,j2,k2) += vf;
+                            if (delPhi_val < 1e-4) {
+                                vol_w_sub(i2,j2,k2) += vf;
+                            }
                         }
                     }
-                }
-                
-                
-                
-                if (vf > 0)  porosity_sub(i2,j2,k2) += vf;
+                    else {
+                        if ( phase_val > 0 ) {
+                            nwp_volume_sub(i2,j2,k2) += vf;
+                            an_sub(i2,j2,k2) += vf;
+                            // velocity
+                            vn_sub(i2,j2,k2,0) += Vel_x(n);
+                            vn_sub(i2,j2,k2,1) += Vel_y(n);
+                            vn_sub(i2,j2,k2,2) += Vel_z(n);
+                            if (delPhi_val < 1e-4){
+                                vol_n_sub(i2,j2,k2) += vf;
+                                pn_sub(i2,j2,k2) += Press(n);
+                            }
+                        }
+                        else {
+                            wp_volume_sub(i2,j2,k2) += vf;
+                            aw_sub(i2,j2,k2) += vf;
+                            // velocity
+                            vw_sub(i2,j2,k2,0) += Vel_x(n);
+                            vw_sub(i2,j2,k2,1) += Vel_y(n);
+                            vw_sub(i2,j2,k2,2) += Vel_z(n);
+                            if (delPhi_val < 1e-4){
+                                vol_w_sub(i2,j2,k2) += vf;
+                                pw_sub(i2,j2,k2) += Press(n);
+                            }
+                        }
+                    }
+                } 
+
+                if (vs > 0.0)  porosity_sub(i2,j2,k2) += vs;
                 
                 //...........................................................................
                 n_nw_pts=n_ns_pts=n_ws_pts=n_nws_pts=n_local_sol_pts=n_local_nws_pts=0;
                 n_nw_tris=n_ns_tris=n_ws_tris=n_nws_seg=n_local_sol_tris=0;
                 //...........................................................................
-                pmmc_ConstructLocalCube(SDs, SDw, solid_isovalue, fluid_isovalue,
+                pmmc_ConstructLocalCube(SDs, SDn, solid_isovalue, fluid_isovalue,
                                         nw_pts, nw_tris, Values, ns_pts, ns_tris, ws_pts, ws_tris,
                                         local_nws_pts, nws_pts, nws_seg, local_sol_pts, local_sol_tris,
                                         n_local_sol_tris, n_local_sol_pts, n_nw_pts, n_nw_tris,
@@ -1851,9 +2225,9 @@ void TwoPhase::ComputeLocal()
                         double tri_normal_y = (A.z-B.z)*(B.x-C.x) - (A.x-B.x)*(B.z-C.z);
                         double tri_normal_z = (A.x-B.x)*(B.y-C.y) - (A.y-B.y)*(B.x-C.x);
 
-                        double normal_x = SDw_x(i,j,k);
-                        double normal_y = SDw_y(i,j,k);
-                        double normal_z = SDw_z(i,j,k);
+                        double normal_x = -SDn_x(i,j,k);
+                        double normal_y = -SDn_y(i,j,k);
+                        double normal_z = -SDn_z(i,j,k);
 
                         if (normal_x*tri_normal_x + normal_y*tri_normal_y + normal_z*tri_normal_z < 0.0){
                             P = A;
@@ -1875,32 +2249,50 @@ void TwoPhase::ComputeLocal()
 
                     }
                 }
-                
-                // wn interface averages
                 if ( n_nw_tris >0 ) {
 
                     double value = pmmc_CubeSurfaceOrientation(Gwn_tmp,nw_pts,nw_tris,n_nw_tris);    // computes normal vector, triangle area, and orientation tensor
                     for (int m=0; m<6; m++)  Gwn_sub(i2,j2,k2,m) += Gwn_tmp(m);
 
+                    pmmc_na(SDn_x, SDn_y, SDn_z,  nwOwnO_tmp, nw_pts, nw_tris,  i,  j,  k, n_nw_pts, n_nw_tris);
+                    for (int m=0; m<3; m++)   nwOwnO_sub(i2,j2,k2,m) += nwOwnO_tmp(m);
+
                     pwn_sub(i2,j2,k2) += pmmc_CubeSurfaceInterpValue(CubeValues,Press,nw_pts,nw_tris,Values,i,j,k,n_nw_pts,n_nw_tris);
 
                     // Compute the normal speed of the interface
-                    Eta_sub(i2,j2,k2) += pmmc_InterfaceSpeed(dPdt, SDw_x, SDw_y, SDw_z, CubeValues, nw_pts, nw_tris, NormalVector, InterfaceSpeed, wwn_tmp, i, j, k, n_nw_pts, n_nw_tris);
+                    Eta_sub(i2,j2,k2) += pmmc_InterfaceSpeed(dPdt, SDn_x, SDn_y, SDn_z, CubeValues, nw_pts, nw_tris, NormalVector, InterfaceSpeed, wwn_tmp, i, j, k, n_nw_pts, n_nw_tris);
 
                     wwn_sub(i2,j2,k2,0) += wwn_tmp(0);
                     wwn_sub(i2,j2,k2,1) += wwn_tmp(1);
                     wwn_sub(i2,j2,k2,2) += wwn_tmp(2);
 
 
-                    //euler_sub(i2,j2,k2) += geomavg_EulerCharacteristic(nw_pts,nw_tris,n_nw_pts,n_nw_tris,i,j,k);
+                    Eta_sub1(i2,j2,k2) += pmmc_interface_velocity_dot_nn(Vel_x, Vel_y, Vel_z, SDn_x, SDn_y, SDn_z, nw_pts, nw_tris,  i,  j,  k, n_nw_pts, n_nw_tris);
                 }
+
             }
         }
     }
     
+    vol_n = vol_n_sub.sum();
+    vol_w = vol_w_sub.sum();
+    wp_volume = wp_volume_sub.sum();
+    nwp_volume = nwp_volume_sub.sum();
+
+    porosity = porosity_sub.sum();
+    an = an_sub.sum();
+    aw = aw_sub.sum();
+    pn = pn_sub.sum();
+    //printf("pn here0: %f \n",pn);
+    pw = pw_sub.sum();
+    pwn = pwn_sub.sum();
+    lwns = lwns_sub.sum();
+    euler = euler_sub.sum();
+    Eta = Eta_sub.sum();
+    Eta1 = Eta_sub1.sum();
 
     // Computed in XXComputeMeshQuantities function
-    aws_sub.fill(0);
+    /*aws_sub.fill(0);
     ans_sub.fill(0);
     awn_sub.fill(0);
     
@@ -1909,28 +2301,11 @@ void TwoPhase::ComputeLocal()
     nwComputeQuantities(m_nw);
     
     // Perform the local reductions
-    porosity = porosity_sub.sum();
-    an = an_sub.sum();
-    aw = aw_sub.sum();
-    
-    vol_n = vol_n_sub.sum();
-    vol_w = vol_w_sub.sum();
-    
-    pn = pn_sub.sum();
-    pw = pw_sub.sum();
-    pwn = pwn_sub.sum();
-    
-    wp_volume = wp_volume_sub.sum();
-    nwp_volume = nwp_volume_sub.sum();
-    
+
     Jwnwwndnw = Jwnwwndnw_sub.sum();
     efawns = efawns_sub.sum();
-    wwnsdnwn = wwnsdnwn_sub.sum();
-    lwns = lwns_sub.sum();
+    wwnsdnwn = wwnsdnwn_sub.sum();*/
     
-    euler = euler_sub.sum();
-    
-    Eta = Eta_sub.sum();
     
     for ( size_t i=0; i<subdivide[0]; i++) {
         for ( size_t j=0; j<subdivide[1]; j++) {
@@ -1940,11 +2315,9 @@ void TwoPhase::ComputeLocal()
                     // Needs to be updated
                     vws(m) += vws_sub(i,j,k,m);
                     vns(m) += vns_sub(i,j,k,m);
-                    
+                    vnw(m) += vnw_sub(i,j,k,m);
                     wwn(m) += wwn_sub(i,j,k,m);
-                    vwns(m) += vwns_sub(i,j,k,m);
-                    nwOwsO(m) += nwOwsO_sub(i,j,k,m);
-                    // nwOwnO(m) += nwOwnO_sub(i,j,k,m);
+                    vnws(m) += vnws_sub(i,j,k,m);
                     vw(m) += vw_sub(i,j,k,m);
                     vn(m) += vn_sub(i,j,k,m);
                     
@@ -1960,8 +2333,8 @@ void TwoPhase::ComputeLocal()
     }
 }
 
-void TwoPhase::MeshComputations(){}
 
+void TwoPhase::MeshComputations(){}
 
 
 void TwoPhase::AssignComponentLabels()
@@ -1999,14 +2372,14 @@ void TwoPhase::ComponentAverages()
 	for (k=kmin; k<kmax; k++){
 		for (j=1; j<Ny-1; j++){
 			for (i=1; i<Nx-1; i++){
-				LabelWP=GetCubeLabel(i,j,k,Label_WP); ///PROBLEM
+				LabelWP=GetCubeLabel(i,j,k,Label_WP);
 				LabelNWP=GetCubeLabel(i,j,k,Label_NWP);
 				n_nw_pts=n_ns_pts=n_ws_pts=n_nws_pts=n_local_sol_pts=n_local_nws_pts=0;
 				n_nw_tris=n_ns_tris=n_ws_tris=n_nws_seg=n_local_sol_tris=0;
 				// Initialize the averaged quantities
 				awn = aws = ans = lwns = 0.0;
-				vwn(0) = vwn(1) = vwn(2) = 0.0;
-				vwns(0) = vwns(1) = vwns(2) = 0.0;
+				vnw(0) = vnw(1) = vnw(2) = 0.0;
+				vnws(0) = vnws(1) = vnws(2) = 0.0;
 				Gwn(0) = Gwn(1) = Gwn(2) = 0.0;
 				Gwn(3) = Gwn(4) = Gwn(5) = 0.0;
 				Gws(0) = Gws(1) = Gws(2) = 0.0;
@@ -2106,13 +2479,13 @@ void TwoPhase::ComponentAverages()
 
 					// Compute the normal speed of the interface
 					pmmc_InterfaceSpeed(dPdt, SDn_x, SDn_y, SDn_z, CubeValues, nw_pts, nw_tris,
-							NormalVector, InterfaceSpeed, vwn, i, j, k, n_nw_pts, n_nw_tris);
-					ComponentAverages_WP(VWNX,LabelWP) += vwn(0);
-					ComponentAverages_WP(VWNY,LabelWP) += vwn(1);
-					ComponentAverages_WP(VWNZ,LabelWP) += vwn(2);
-					ComponentAverages_NWP(VWNX,LabelNWP) += vwn(0);
-					ComponentAverages_NWP(VWNY,LabelNWP) += vwn(1);
-					ComponentAverages_NWP(VWNZ,LabelNWP) += vwn(2);
+							NormalVector, InterfaceSpeed, vnw, i, j, k, n_nw_pts, n_nw_tris);
+					ComponentAverages_WP(VNWX,LabelWP) += vnw(0);
+					ComponentAverages_WP(VNWY,LabelWP) += vnw(1);
+					ComponentAverages_WP(VNWZ,LabelWP) += vnw(2);
+					ComponentAverages_NWP(VNWX,LabelNWP) += vnw(0);
+					ComponentAverages_NWP(VNWY,LabelNWP) += vnw(1);
+					ComponentAverages_NWP(VNWZ,LabelNWP) += vnw(2);
 
 					// Interfacial Area
 					TempLocal = pmmc_CubeSurfaceOrientation(Gwn,nw_pts,nw_tris,n_nw_tris);
@@ -2144,14 +2517,14 @@ void TwoPhase::ComponentAverages()
 					ComponentAverages_NWP(CWNS,LabelNWP) += TempLocal;
 
 					// Kinematic velocity of the common curve
-					pmmc_CommonCurveSpeed(CubeValues, dPdt, vwns, SDn_x, SDn_y, SDn_z,SDs_x,SDs_y,SDs_z,
+					pmmc_CommonCurveSpeed(CubeValues, dPdt, vnws, SDn_x, SDn_y, SDn_z,SDs_x,SDs_y,SDs_z,
 							local_nws_pts,i,j,k,n_local_nws_pts);
-					ComponentAverages_WP(VWNSX,LabelWP) += vwns(0);
-					ComponentAverages_WP(VWNSY,LabelWP) += vwns(1);
-					ComponentAverages_WP(VWNSZ,LabelWP) += vwns(2);
-					ComponentAverages_NWP(VWNSX,LabelNWP) += vwns(0);
-					ComponentAverages_NWP(VWNSY,LabelNWP) += vwns(1);
-					ComponentAverages_NWP(VWNSZ,LabelNWP) += vwns(2);
+					ComponentAverages_WP(VNWSX,LabelWP) += vnws(0);
+					ComponentAverages_WP(VNWSY,LabelWP) += vnws(1);
+					ComponentAverages_WP(VNWSZ,LabelWP) += vnws(2);
+					ComponentAverages_NWP(VNWSX,LabelNWP) += vnws(0);
+					ComponentAverages_NWP(VNWSY,LabelNWP) += vnws(1);
+					ComponentAverages_NWP(VNWSZ,LabelNWP) += vnws(2);
 
 					// Curvature of the common curve
                     pmmc_CurveCurvature(SDn, SDs, SDn_x, SDn_y, SDn_z, SDs_x, SDs_y,
@@ -2232,9 +2605,9 @@ void TwoPhase::ComponentAverages()
 	}
 
 	MPI_Barrier(Dm->Comm);
-	if (Dm->rank()==0){
+	/*if (Dm->rank()==0){
 		printf("Component averages computed locally -- reducing result... \n");
-	}
+	}*/
 	// Globally reduce the non-wetting phase averages
 	RecvBuffer.resize(BLOB_AVG_COUNT,NumberComponents_NWP);
 
@@ -2248,9 +2621,9 @@ void TwoPhase::ComponentAverages()
 	MPI_Allreduce(ComponentAverages_NWP.data(),RecvBuffer.data(),BLOB_AVG_COUNT*NumberComponents_NWP,MPI_DOUBLE,MPI_SUM,Dm->Comm);
 	//	MPI_Reduce(ComponentAverages_NWP.data(),RecvBuffer.data(),BLOB_AVG_COUNT,MPI_DOUBLE,MPI_SUM,0,Dm->Comm);
   
-	if (Dm->rank()==0){
+	/*if (Dm->rank()==0){
 		printf("rescaling... \n");
-	}
+	}*/
 
 	for (int b=0; b<NumberComponents_NWP; b++){
 		for (int idx=0; idx<BLOB_AVG_COUNT; idx++) ComponentAverages_NWP(idx,b)=RecvBuffer(idx,b);
@@ -2278,9 +2651,9 @@ void TwoPhase::ComponentAverages()
 			if (awn != 0.0){
 				Jwn = ComponentAverages_NWP(JWN,b)/awn;
 				Kwn = ComponentAverages_NWP(KWN,b)/awn;
-				vwn(0) = ComponentAverages_NWP(VWNX,b)/awn;
-				vwn(1) = ComponentAverages_NWP(VWNY,b)/awn;
-				vwn(2) = ComponentAverages_NWP(VWNZ,b)/awn;
+				vnw(0) = ComponentAverages_NWP(VNWX,b)/awn;
+				vnw(1) = ComponentAverages_NWP(VNWY,b)/awn;
+				vnw(2) = ComponentAverages_NWP(VNWZ,b)/awn;
 				Gwn(0) = ComponentAverages_NWP(GWNXX,b)/awn;
 				Gwn(1) = ComponentAverages_NWP(GWNYY,b)/awn;
 				Gwn(2) = ComponentAverages_NWP(GWNZZ,b)/awn;
@@ -2303,9 +2676,9 @@ void TwoPhase::ComponentAverages()
 			lwns = ComponentAverages_NWP(LWNS,b);
 			if (lwns != 0.0){
 				cwns = ComponentAverages_NWP(CWNS,b)/lwns;
-				vwns(0) = ComponentAverages_NWP(VWNSX,b)/lwns;
-				vwns(1) = ComponentAverages_NWP(VWNSY,b)/lwns;
-				vwns(2) = ComponentAverages_NWP(VWNSZ,b)/lwns;
+				vnws(0) = ComponentAverages_NWP(VNWSX,b)/lwns;
+				vnws(1) = ComponentAverages_NWP(VNWSY,b)/lwns;
+				vnws(2) = ComponentAverages_NWP(VNWSZ,b)/lwns;
                 KNwns = ComponentAverages_NWP(KNWNS,b)/lwns;
                 KGwns = ComponentAverages_NWP(KGWNS,b)/lwns;
 			}
@@ -2323,9 +2696,9 @@ void TwoPhase::ComponentAverages()
 
 			ComponentAverages_NWP(JWN,b) = Jwn;
 			ComponentAverages_NWP(KWN,b) = Kwn;
-			ComponentAverages_NWP(VWNX,b) = vwn(0);
-			ComponentAverages_NWP(VWNY,b) = vwn(1);
-			ComponentAverages_NWP(VWNZ,b) = vwn(2);
+			ComponentAverages_NWP(VNWX,b) = vnw(0);
+			ComponentAverages_NWP(VNWY,b) = vnw(1);
+			ComponentAverages_NWP(VNWZ,b) = vnw(2);
 			
 			ComponentAverages_NWP(GWNXX,b) = Gwn(0);
 			ComponentAverages_NWP(GWNYY,b) = Gwn(1);
@@ -2342,9 +2715,9 @@ void TwoPhase::ComponentAverages()
 			ComponentAverages_NWP(GYZ,b) = Gns(5);
 
 			ComponentAverages_NWP(CWNS,b) = cwns;
-			ComponentAverages_NWP(VWNSX,b) = vwns(0);
-			ComponentAverages_NWP(VWNSY,b) = vwns(1);
-			ComponentAverages_NWP(VWNSZ,b) = vwns(2);
+			ComponentAverages_NWP(VNWSX,b) = vnws(0);
+			ComponentAverages_NWP(VNWSY,b) = vnws(1);
+			ComponentAverages_NWP(VNWSZ,b) = vnws(2);
             ComponentAverages_NWP(KNWNS,b) = KNwns;
             ComponentAverages_NWP(KGWNS,b) = KGwns;
 
@@ -2358,9 +2731,9 @@ void TwoPhase::ComponentAverages()
 
 	}
 
-	if (Dm->rank()==0){
+	/*if (Dm->rank()==0){
 		printf("reduce WP averages... \n");
-	}
+	}*/
 
 	// reduce the wetting phase averages
 	for (int b=0; b<NumberComponents_WP; b++){
@@ -2390,9 +2763,9 @@ void TwoPhase::ComponentAverages()
 			if (awn != 0.0){
 				Jwn = ComponentAverages_WP(JWN,b)/awn;
 				Kwn = ComponentAverages_WP(KWN,b)/awn;
-				vwn(0) = ComponentAverages_WP(VWNX,b)/awn;
-				vwn(1) = ComponentAverages_WP(VWNY,b)/awn;
-				vwn(2) = ComponentAverages_WP(VWNZ,b)/awn;
+				vnw(0) = ComponentAverages_WP(VNWX,b)/awn;
+				vnw(1) = ComponentAverages_WP(VNWY,b)/awn;
+				vnw(2) = ComponentAverages_WP(VNWZ,b)/awn;
 				Gwn(0) = ComponentAverages_WP(GWNXX,b)/awn;
 				Gwn(1) = ComponentAverages_WP(GWNYY,b)/awn;
 				Gwn(2) = ComponentAverages_WP(GWNZZ,b)/awn;
@@ -2415,9 +2788,9 @@ void TwoPhase::ComponentAverages()
 			lwns = ComponentAverages_WP(LWNS,b);
 			if (lwns != 0.0){
 				cwns = ComponentAverages_WP(CWNS,b)/lwns;
-				vwns(0) = ComponentAverages_WP(VWNSX,b)/lwns;
-				vwns(1) = ComponentAverages_WP(VWNSY,b)/lwns;
-				vwns(2) = ComponentAverages_WP(VWNSZ,b)/lwns;
+				vnws(0) = ComponentAverages_WP(VNWSX,b)/lwns;
+				vnws(1) = ComponentAverages_WP(VNWSY,b)/lwns;
+				vnws(2) = ComponentAverages_WP(VNWSZ,b)/lwns;
                 KNwns = ComponentAverages_WP(KNWNS,b)/lwns;
                 KGwns = ComponentAverages_WP(KGWNS,b)/lwns;
 			}
@@ -2435,9 +2808,9 @@ void TwoPhase::ComponentAverages()
 
 			ComponentAverages_WP(JWN,b) = Jwn;
 			ComponentAverages_WP(KWN,b) = Kwn;
-			ComponentAverages_WP(VWNX,b) = vwn(0);
-			ComponentAverages_WP(VWNY,b) = vwn(1);
-			ComponentAverages_WP(VWNZ,b) = vwn(2);
+			ComponentAverages_WP(VNWX,b) = vnw(0);
+			ComponentAverages_WP(VNWY,b) = vnw(1);
+			ComponentAverages_WP(VNWZ,b) = vnw(2);
 			
 			ComponentAverages_WP(GWNXX,b) = Gwn(0);
 			ComponentAverages_WP(GWNYY,b) = Gwn(1);
@@ -2454,9 +2827,9 @@ void TwoPhase::ComponentAverages()
 			ComponentAverages_WP(GYZ,b) = Gws(5);
 
 			ComponentAverages_WP(CWNS,b) = cwns;
-			ComponentAverages_WP(VWNSX,b) = vwns(0);
-			ComponentAverages_WP(VWNSY,b) = vwns(1);
-			ComponentAverages_WP(VWNSZ,b) = vwns(2);
+			ComponentAverages_WP(VNWSX,b) = vnws(0);
+			ComponentAverages_WP(VNWSY,b) = vnws(1);
+			ComponentAverages_WP(VNWSZ,b) = vnws(2);
             ComponentAverages_WP(KNWNS,b) = KNwns;
             ComponentAverages_WP(KGWNS,b) = KGwns;
 
@@ -2486,35 +2859,29 @@ void TwoPhase::ReduceGlobal()
     MPI_Allreduce(&aw,&aw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
     MPI_Allreduce(&Eta,&Eta_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    MPI_Allreduce(&awn,&awn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+    MPI_Allreduce(&Eta1,&Eta_global1,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+
+    //MPI_Allreduce(&awn,&awn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
     MPI_Allreduce(&euler,&euler_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     //   std::cout << "euler_global=" << euler_global << std::endl;
     
     MPI_Allreduce(&vol_w,&vol_w_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&vol_n,&vol_n_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    
     MPI_Allreduce(&local_nw_phase_volume,&global_nw_phase_volume,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    
     MPI_Allreduce(&mass_local,&mass_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
     if (awn_global == 0.0) {
-        KwnW_global = 0.0;
-        JwnW_global = 0.0;
         Jwn_global = 0.0;
         Kwn_global = 0.0;
     }
     if (aws_global == 0.0){
         Jws_global = 0.0;
         Kws_global = 0.0;
-        JwsS_global = 0.0;
-        KwsS_global = 0.0;
     }
     if (ans_global == 0.0) {
         Jns_global = 0.0;
         Kns_global = 0.0;
-        JnsS_global = 0.0;
-        KnsS_global = 0.0;
     }
     
     /* Common curve curvatures  */
@@ -2523,19 +2890,27 @@ void TwoPhase::ReduceGlobal()
     
     /* Common Curve Reduction */
     MPI_Allreduce(&efawns,&efawns_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    
+    efawns_global /= double(npx * npy * npz);
+
     /* Pressure */
     MPI_Allreduce(&pw,&pw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&pwn,&pwn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    MPI_Allreduce(&pn,&pn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
+    //printf("pn here1: %f \n",pn);
+    MPI_Allreduce(&pn,&pn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+
+    //printf("pn here2: %f \n",pn_global);
+
     if (vol_n_global > 0) {
         pn_global /= vol_n_global;
     }
     else {
         pn_global = 0.0;
     }
-    
+
+    //printf("vol_n_global here3: %f \n",vol_n_global);
+    //printf("pn here3: %f \n",pn_global);
+
     if (vol_w_global > 0) {
         pw_global /= vol_w_global;
     }
@@ -2557,10 +2932,12 @@ void TwoPhase::ReduceGlobal()
     
     MPI_Allreduce(&vws(0),&vws_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&vns(0),&vns_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    MPI_Allreduce(&vwns(0),&vwns_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
-    //  MPI_Allreduce(&vwndnw,&vwndnw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+    MPI_Allreduce(&vnw(0),&vnw_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+    MPI_Allreduce(&vnws(0),&vnws_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+    MPI_Allreduce(&vnwdnw,&vnwdnw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&wwndnw,&wwndnw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&wwnsdnwn,&wwnsdnwn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
+    MPI_Allreduce(&nwOwnO(0),&nwOwnO_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
     if (wp_volume_global > 0.0){
         vw_global(0) /= wp_volume_global;
@@ -2571,7 +2948,6 @@ void TwoPhase::ReduceGlobal()
         vw_global(0) = 0.0;
         vw_global(1) = 0.0;
         vw_global(2) = 0.0;
-        
     }
     if (nwp_volume_global > 0.0){
         vn_global(0) /= nwp_volume_global;
@@ -2583,12 +2959,11 @@ void TwoPhase::ReduceGlobal()
         vn_global(1) = 0.0;
         vn_global(2) = 0.0;
     }
-    
     if (awn_global > 0.0) {
-        for (int i=0; i<3; i++) vwn_global(i)/= awn_global;
+        for (int i=0; i<3; i++) vnw_global(i)/= awn_global;
     }
     else {
-        for (int i=0; i<3; i++) vwn_global(i) = 0;
+        for (int i=0; i<3; i++) vnw_global(i) = 0;
     }
     if (awn_global > 0) {
         wwndnw_global /= awn_global;
@@ -2596,7 +2971,6 @@ void TwoPhase::ReduceGlobal()
     else {
         wwndnw_global = 0;
     }
-    
     
     /* Orientation Reductions */
     MPI_Allreduce(&Gwn(0),&Gwn_global(0),6,MPI_DOUBLE,MPI_SUM,Dm->Comm);
@@ -2627,57 +3001,41 @@ void TwoPhase::ReduceGlobal()
         for (int i=0; i<6; i++) Gws_global(i) = 0.0;
     }
     
-    
-    
-    
-    
-    
-    
     /* Curvature Reductions */
     MPI_Allreduce(&lwns,&lwns_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     if (lwns_global > 0.0){
-        efawns_global /= lwns_global;
+        //efawns_global /= lwns_global;
         KNwns_global /= lwns_global;
         KGwns_global /= lwns_global;
-        for (int i=0; i<3; i++) vwns_global(i) /= lwns_global;
+        for (int i=0; i<3; i++) vnws_global(i) /= lwns_global;
         for (int i=0; i<6; i++) Gwns_global(i) /= lwns_global;
     }
     else {
         efawns_global = 1.0;
         KNwns_global = 0.0;
         KGwns_global = 0.0;
-        for (int i=0; i<3; i++) vwns_global(i) = 0.0;
+        for (int i=0; i<3; i++) vnws_global(i) = 0.0;
         for (int i=0; i<6; i++) Gwns_global(i) = 0.0;
     }
     
     MPI_Allreduce(&nwOwsO(0),&nwOwsO_global(0),3,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Barrier(Dm->Comm);
     // <v_wn . n_w >_OwnO
-    //vwndnw_global = vwndnw_global*iVol_global;
-    
-    euler_global /= (2*PI);
+    vnwdnw_global = vnwdnw_global*iVol_global;
+    Eta_global = Eta_global*iVol_global;
+    Eta_global1 = Eta_global1*iVol_global;
 
-    Eta_global = Eta_global * iVol_global;
     // w^wn
     wwn_global(0) = wwn_global(0)*iVol_global;
     wwn_global(1) = wwn_global(1)*iVol_global;
     wwn_global(2) = wwn_global(2)*iVol_global;
-    nwOwsO_global(0) = nwOwsO_global(0)*iVol_global;
-    nwOwsO_global(1) = nwOwsO_global(1)*iVol_global;
-    nwOwsO_global(2) = nwOwsO_global(2)*iVol_global;
     porosity_global *= iVol_global;
-    eulerW_global *= iVol_global;
-    eulerS_global *= iVol_global;
-    
-    
-    awn2_global *=iVol_global;
-    /* Do these last */
-    awn_global = awn_global*iVol_global;
     ans_global = ans_global*iVol_global;
     aws_global = aws_global*iVol_global;
     lwns_global = lwns_global*iVol_global;
     an_global = an_global*iVol_global;
     aw_global = aw_global*iVol_global;
+
 }
 
 void TwoPhase::NonDimensionalize(double D, double viscosity, double IFT)
@@ -2692,34 +3050,13 @@ void TwoPhase::NonDimensionalize(double D, double viscosity, double IFT)
 
 void TwoPhase::PrintAll(int timestep)
 {
-    
-    //    const char header[] = "time porosity "
-    //    "s^w p^w* p^n* eps^{wn}* eps^{ns}* eps^{ws}* J_n^{wn}* K_n^{wn}* l^{wns}* c^{wns} kappa_N^{wns}* kappa_G^{wns}* "   // Scalar averages
-    //    "v_x^w* v_y^w* v_z^w* v_x^n* v_y^n* v_z^n* v_x^{wn}* v_y^{wn}* v_z^{wn}* v_x^{wns}* v_y^{wns}* v_z^{wns}* "         // Velocity averages
-    //    "G_{xx}^{wn}* G_{yy}^{wn}* G_{zz}^{wn}* G_{xy}^{wn}* G_{xz}^{wn}* G_{yz}^{wn}* "
-    //    "G_{xx}^{ws}* G_{yy}^{ws}* G_{zz}^{ws}* G_{xy}^{ws}* G_{xz}^{ws}* G_{yz}^{ws}* "
-    //    "G_{xx}^{ns}* G_{yy}^{ns}* G_{zz}^{ns}* G_{xy}^{ns}* G_{xz}^{ns}* G_{yz}^{ns}* "
-    //    "p_n^{wn}* X^n* eps^w eps^n "
-    //    "G_{xx}^{wns}* G_{yy}^{wns}* G_{zz}^{wns}* G_{xy}^{wns}* G_{xz}^{wns}* G_{yz}^{wns}* "
-    //    "v_x^{ws}* v_y^{ws}* v_z^{ws}* v_x^{ns}* v_y^{ns}* v_z^{ns}* "
-    //    "nw_x- nw_y- nw_z- vwndnw- wwnx- wwny- wwnz- nwOwnOx- nwOwnOy- nwOwnOz- nwOwsOx- nwOwsOy- nwOwsOz- "
-    //    "J_w^{ws}* K_w^{ws}* J_n^{ns}* K_n^{ns}* X^w* J_w^{wn}* K_w^{wn}* J_s^{ws}* K_s^{ws}* J_s^{ns}* K_s^{ns}* X^s* dewdt- eps_s* J_n J_w J_s K_n K_w K_s";
-    
-    double eps_s = ans_global + aws_global;
-    double J_n = 0;
-    double J_w = 0;
-    double J_s = 0;
-    double K_n = 0;
-    double K_w = 0;
-    double K_s = 0;
-    
-    
-    
-    
+
     if ( TIMELOG_global ){
         
         // double alpha,sphere_diameter,average_rho_input, average_mu;
-        Ca_global = abs(vn_global(2) *average_mu)/(5.796*alpha*1.0);
+        //Ca_global = abs(vn_global(2) *average_mu)/(5.796*alpha*1.0);
+
+        Ca_global = abs(vn_global(2)*muA + vw_global(2)*muB)/(5.796*alpha*1.0);
         Re_global = abs(vn_global(2) *1.0 * sphere_diameter)/(average_mu);
         
         if (Ca_global < 1E-15) Ca_global = 0.0;
@@ -2727,9 +3064,10 @@ void TwoPhase::PrintAll(int timestep)
         
         double sat_w = 1.0 - nwp_volume_global/(nwp_volume_global+wp_volume_global);
         // double poros = porosity_global;
-        efawns_global = std::acos(efawns_global)*180/PI;
+        // efawns_global = std::acos(efawns_global)*180/PI;
         
-        
+        //printf("pn here4: %f \n",pn_global);
+
         nw_global(0) = nw_global(1) = nw_global(2) = 0;
         // "time porosity s^w p^w* p^n* eps^{wn}* eps^{ns}* eps^{ws}* J_n^{wn}* K_n^{wn}* l^{wns}* c^{wns} kappa_N^{wns}* kappa_G^{wns}* "
         fprintf(TIMELOG_global,"%i %-15.15E ",timestep,porosity_global);  // porosity and change in surface energy
@@ -2743,8 +3081,8 @@ void TwoPhase::PrintAll(int timestep)
         // ""v_x^w* v_y^w* v_z^w* v_x^n* v_y^n* v_z^n* v_x^{wn}* v_y^{wn}* v_z^{wn}* v_x^{wns}* v_y^{wns}* v_z^{wns}* "
         fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vw_global(0),vw_global(1),vw_global(2));    // average velocity of w phase
         fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vn_global(0),vn_global(1),vn_global(2));    // average velocity of n phase
-        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vwn_global(0),vwn_global(1),vwn_global(2)); // velocity of wn interface
-        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vwns_global(0),vwns_global(1),vwns_global(2)); // velocity of wn interface
+        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vnw_global(0),vnw_global(1),vnw_global(2)); // velocity of wn interface
+        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",vnws_global(0),vnws_global(1),vnws_global(2)); // velocity of wn interface
         
         // "G_{xx}^{wn}* G_{yy}^{wn}* G_{zz}^{wn}* G_{xy}^{wn}* G_{xz}^{wn}* G_{yz}^{wn}* "
         // "G_{xx}^{ws}* G_{yy}^{ws}* G_{zz}^{ws}* G_{xy}^{ws}* G_{xz}^{ws}* G_{yz}^{ws}* "
@@ -2767,7 +3105,7 @@ void TwoPhase::PrintAll(int timestep)
         fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E ",
                 vws_global(0),vws_global(1),vws_global(2),vns_global(0),vns_global(1),vns_global(2)); // velocity ws and ns
         
-        // "nw_x- nw_y- nw_z- vwndnw- wwnx- wwny- wwnz- nwOwnOx- nwOwnOy- nwOwnOz- nwOwsOx- nwOwsOy- nwOwsOz- "
+        // "nw_x- nw_y- nw_z- vnwdnw- wwnx- wwny- wwnz- nwOwnOx- nwOwnOy- nwOwnOz- nwOwsOx- nwOwsOy- nwOwsOz- "
         fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",
                 nwOwnO_global2(0),nwOwnO_global2(1),nwOwnO_global2(2));
         fprintf(TIMELOG_global,"%-15.15E ",
@@ -2775,7 +3113,8 @@ void TwoPhase::PrintAll(int timestep)
         fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E ",
                 wwn_global(0),wwn_global(1),wwn_global(2));
         // "Jwn2 Kwn2"
-        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E %-15.15E\n", Jwn2_global, Kwn2_global, Ca_global, Re_global);
+//        fprintf(TIMELOG_global,"%-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E\n", Jwn2_global, Kwn2_global, Ca_global, Re_global, an_global1, an_global2, an_global3, Eta_global1, dendt_global,dendt_global3);
+        fprintf(TIMELOG_global,"%-15.15E %-15.15E\n", Ca_global, Re_global);
         
         
         
@@ -2817,9 +3156,6 @@ void TwoPhase::PrintAll(int timestep)
         if (awn > 0.0) {
             //            Jwn /= awn;
             //            Kwn /= awn;
-            //            JwnW /= awn;
-            //            KwnW /= awn;
-            //
             //            pwn /= awn;
         }
         else {
@@ -2833,8 +3169,6 @@ void TwoPhase::PrintAll(int timestep)
         if (aws > 0.0) {
             //            Jws /= aws;
             //            Kws /= aws;
-            //            JwsS /= aws;
-            //            KwsS /= aws;
         }
         else {
             Jws = 0;
@@ -2846,8 +3180,6 @@ void TwoPhase::PrintAll(int timestep)
         if (ans > 0.0) {
             //            Jns /= ans;
             //            Kns /= ans;
-            //            JnsS /= ans;
-            //            KnsS /= ans;
         }
         else {
             Jns = 0;
@@ -2859,22 +3191,22 @@ void TwoPhase::PrintAll(int timestep)
         if (lwns > 0.0) {
             KNwns /= lwns;
             KGwns /= lwns;
-            efawns /= lwns;
+            // efawns /= lwns;
         }
         else {
             KNwns = 0;
             KGwns = 0;
-            efawns = 1.0;
+            // efawns = 1.0;
         }
         
         
         for (int m = 0; m < 3; m++) {
             if (wp_volume > 0.0) {vw(m) /= wp_volume;   } else { vw(m) = 0; }
             if (nwp_volume > 0.0) {vn(m) /= nwp_volume; } else { vn(m) = 0; }
-            if (awn > 0.0) {vwn(m) /= awn;} else { vwn(m) = 0; }
+            if (awn > 0.0) {vnw(m) /= awn;} else { vnw(m) = 0; }
             if (aws > 0.0) {vws(m) /= aws;} else { vws(m) = 0; }
             if (ans > 0.0) {vns(m) /= ans;} else { vns(m) = 0; }
-            if (lwns > 0.0) {vwns(m) /= lwns;} else { vwns(m) = 0; }
+            if (lwns > 0.0) {vnws(m) /= lwns;} else { vnws(m) = 0; }
         }
         
         for (int m = 0; m < 6; m++ ) {
@@ -2884,39 +3216,43 @@ void TwoPhase::PrintAll(int timestep)
             if (lwns > 0.0){Gwns(m) /= lwns; } else { Gwns(m) = 0; }
         }
         
-        wwn(0) *= iVol_nodal;  if (awn > 0) { wwn(0) /= awn; }  else{ wwn(0) = 0;}
-        wwn(1) *= iVol_nodal;  if (awn > 0) { wwn(1) /= awn; }  else{ wwn(1) = 0;}
-        wwn(2) *= iVol_nodal;  if (awn > 0) { wwn(2) /= awn; }  else{ wwn(2) = 0;}
+        //        wwn(0) *= iVol_nodal;
+        if (awn > 0) { wwn(0) /= awn; }  else{ wwn(0) = 0;}
+        //        wwn(1) *= iVol_nodal;
+        if (awn > 0) { wwn(1) /= awn; }  else{ wwn(1) = 0;}
+        //        wwn(2) *= iVol_nodal;
+        if (awn > 0) { wwn(2) /= awn; }  else{ wwn(2) = 0;}
         
-        nwOwnO(0) *= iVol_nodal;
-        nwOwnO(1) *= iVol_nodal;
-        nwOwnO(2) *= iVol_nodal;
+        //        nwOwnO(0) *= iVol_nodal;
+        //        nwOwnO(1) *= iVol_nodal;
+        //        nwOwnO(2) *= iVol_nodal;
+        //
+        //        nwOwsO(0) *= iVol_nodal;
+        //        nwOwsO(1) *= iVol_nodal;
+        //        nwOwsO(2) *= iVol_nodal;
         
-        nwOwsO(0) *= iVol_nodal;
-        nwOwsO(1) *= iVol_nodal;
-        nwOwsO(2) *= iVol_nodal;
-        
-        // vwndnw *= iVol_nodal;
-        Eta *= iVol_nodal;
+        // vnwdnw *= iVol_nodal;
+        //        Eta *= iVol_nodal;
         
         // 1^{wn}
-        awn *= iVol_nodal;
-        // 1^{ws}
-        aws *= iVol_nodal;
-        // 1^{ns}
-        ans *= iVol_nodal;
-        // 1^{nws}
-        lwns *= iVol_nodal;
-        // 1^w
-        aw *= iVol_nodal;
+        //        awn *= iVol_nodal;
+        //        // 1^{ws}
+        //        aws *= iVol_nodal;
+        //        // 1^{ns}
+        //        ans *= iVol_nodal;
+        //        // 1^{nws}
+        //        lwns *= iVol_nodal;
+        //        // 1^w
+        //        aw *= iVol_nodal;
         // 1^n
-         an *= iVol_nodal;
-        // printf("vwndnw=%f\n",vwndnw);
+        // an *= iVol_nodal;
+        // printf("vnwdnw=%f\n",vnwdnw);
         
         nw(0) = nw(1) = nw(2) = 0;
         
         
-        double Ca = fabs(vn(2) *average_mu)/(5.796*alpha*1.0);
+        //double Ca = fabs(vn(2) *average_mu)/(5.796*alpha*1.0);
+        double Ca = fabs(vn(2)*muA + vw(2)*muB)/(5.796*alpha*1.0);
         double Re = fabs(vn(2) *1.0 * sphere_diameter)/(average_mu);
         
         double sat_w = 1.0 - nwp_volume/(nwp_volume+wp_volume);
@@ -2924,7 +3260,7 @@ void TwoPhase::PrintAll(int timestep)
         //        aw = wp_volume_global/(nwp_volume_global+wp_volume_global);
         
         // double poros = 1.0 - porosity;
-        efawns = std::acos(efawns)*180/PI;
+        // efawns = std::acos(efawns)*180/PI;
         //               efawns = 180 - efawns;
         //               efawns = (efawns >= 180) ? efawns -180 : efawns;
         fprintf(TIMELOG_local,"%i %-15.15E ",timestep, porosity);                        // porosity
@@ -2936,8 +3272,8 @@ void TwoPhase::PrintAll(int timestep)
         fprintf(TIMELOG_local,"%-15.15E %-15.15E ",KNwns, KGwns);                           // curvature of wn interface
         fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vw(0),vw(1),vw(2));              // average velocity of w phase
         fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vn(0),vn(1),vn(2));              // average velocity of n phase
-        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vwn(0),vwn(1),vwn(2));           // velocity of wn interface
-        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vwns(0),vwns(1),vwns(2));        // velocity of wn interface
+        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vnw(0),vnw(1),vnw(2));           // velocity of wn interface
+        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",vnws(0),vnws(1),vnws(2));        // velocity of wn interface
         fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E ",
                 Gwn(0),Gwn(1),Gwn(2),Gwn(3),Gwn(4),Gwn(5));    // orientation of wn interface
         fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E ",
@@ -2955,7 +3291,8 @@ void TwoPhase::PrintAll(int timestep)
                 Eta);
         fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",
                 wwn(0),wwn(1),wwn(2));
-        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E %-15.15E\n",Jwn2, Kwn2, Ca, Re);
+//        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E %-15.15E\n",Jwn2, Kwn2, Ca, Re, an1, an2, an3, Eta1, dendt, dendt3);
+        fprintf(TIMELOG_local,"%-15.15E %-15.15E\n",Ca, Re);
         //        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",trawn, trJwn, trRwn);               // Trimmed curvature
         //        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E ",wwndnw, wwnsdnwn, Jwnwwndnw);       // kinematic quantities
         //        fprintf(TIMELOG_local,"%-15.15E %-15.15E %-15.15E %-15.15E ",euler, Kn, Jn, An);           // minkowski measures
@@ -2970,19 +3307,16 @@ void TwoPhase::PrintAll(int timestep)
         //                  "G_{xx}^{ns} G_{yy}^{ns} G_{zz}^{ns} G_{xy}^{ns} G_{xz}^{ns} G_{yz}^{ns} "
         //                  "p_n^{wn} X^n eps^w eps^n "
         //                  "G_{xx}^{wns} G_{yy}^{wns} G_{zz}^{wns} G_{xy}^{wns} G_{xz}^{wns} G_{yz}^{wns} "
-        //                  "v_x^{ws} v_y^{ws} v_z^{ws} v_x^{ns} v_y^{ns} v_z^{ns} nw_x nw_y nw_z vwndnw wwnx wwny wwnz Jwn2* Kwn2*";
+        //                  "v_x^{ws} v_y^{ws} v_z^{ws} v_x^{ns} v_y^{ns} v_z^{ns} nw_x nw_y nw_z vnwdnw wwnx wwny wwnz Jwn2* Kwn2*";
         fflush(TIMELOG_local);
     }
-    
-    
-    
-    
 }
+
 
 void TwoPhase::PrintComponents(int timestep)
 {
     if (Dm->rank()==0){
-        printf("PRINT %i COMPONENT AVEREAGES: time = %i \n",(int)ComponentAverages_NWP.size(1),timestep);
+        printf("PRINT %i COMPONENT AVERAGES: time = %i \n",(int)ComponentAverages_NWP.size(1),timestep);
         for (int b=0; b<NumberComponents_NWP; b++){
             //if (ComponentAverages_NWP(TRIMVOL,b) > 0.0){
             fprintf(NWPLOG,"%i ",timestep);
@@ -2993,9 +3327,9 @@ void TwoPhase::PrintComponents(int timestep)
                 // print final global id
                 fprintf(NWPLOG,"%i ",Label_NWP_map[b]);
             }
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VOL,b));
+            fprintf(NWPLOG,"%-15.15E\n",ComponentAverages_NWP(VOL,b));
             //			fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(TRIMVOL,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(PRS,b));
+            /*fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(PRS,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(AWN,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(AWNS,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(JWN,b));
@@ -3007,12 +3341,12 @@ void TwoPhase::PrintComponents(int timestep)
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VX,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VY,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VZ,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNX,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNY,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNZ,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNSX,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNSY,b));
-            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VWNSZ,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWX,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWY,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWZ,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWSX,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWSY,b));
+            fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(VNWSZ,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(GWNXX,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(GWNYY,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(GWNZZ,b));
@@ -3032,7 +3366,7 @@ void TwoPhase::PrintComponents(int timestep)
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(CMX,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(CMY,b));
             fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(CMZ,b));
-            fprintf(NWPLOG,"%-15.15E\n",ComponentAverages_NWP(VSQ,b));
+            fprintf(NWPLOG,"%-15.15E\n",ComponentAverages_NWP(VSQ,b));*/
             //				fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(NVERT,b));
             //			fprintf(NWPLOG,"%-15.15E ",ComponentAverages_NWP(NSIDE,b));
             //		fprintf(NWPLOG,"%-15.15E\n",ComponentAverages_NWP(NFACE,b));
@@ -3044,9 +3378,9 @@ void TwoPhase::PrintComponents(int timestep)
             if (ComponentAverages_WP(TRIMVOL,b) > 0.0 ){
                 fprintf(WPLOG,"%i ",timestep);
                 fprintf(WPLOG,"%i ",b);
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VOL,b));
+                fprintf(WPLOG,"%-15.15E\n",ComponentAverages_WP(VOL,b));
                 //			fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(TRIMVOL,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(PRS,b));
+                /*fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(PRS,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(AWN,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(AWNS,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(JWN,b));
@@ -3058,12 +3392,12 @@ void TwoPhase::PrintComponents(int timestep)
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VX,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VY,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VZ,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNX,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNY,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNZ,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNSX,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNSY,b));
-                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VWNSZ,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWX,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWY,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWZ,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWSX,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWSY,b));
+                fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(VNWSZ,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(GWNXX,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(GWNYY,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(GWNZZ,b));
@@ -3079,7 +3413,7 @@ void TwoPhase::PrintComponents(int timestep)
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(CMX,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(CMY,b));
                 fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(CMZ,b));
-                fprintf(WPLOG,"%-15.15E\n",ComponentAverages_WP(VSQ,b));
+                fprintf(WPLOG,"%-15.15E\n",ComponentAverages_WP(VSQ,b));*/
                 //fprintf(WPLOG,"%-15.15E ",ComponentAverages_WP(TRAWN,b));
                 //fprintf(WPLOG,"%-15.15E\n",ComponentAverages_WP(TRJWN,b));
                 
@@ -3088,6 +3422,7 @@ void TwoPhase::PrintComponents(int timestep)
         fflush(WPLOG);
     }
 }
+
 
 inline int TwoPhase::GetCubeLabel(int i, int j, int k, IntArray &BlobLabel)
 {
@@ -3104,8 +3439,6 @@ inline int TwoPhase::GetCubeLabel(int i, int j, int k, IntArray &BlobLabel)
     return label;
 }
 
-
-
 void TwoPhase::SortBlobs()
 {
     //printf("Sorting the blobs based on volume \n");
@@ -3118,12 +3451,9 @@ void TwoPhase::SortBlobs()
     IntArray OldLabel(NumberComponents_NWP);
     for (a=0; a<NumberComponents_NWP; a++)	OldLabel(a) = a;
     // Sort the blob averages based on volume
-    for (aa=0; aa<NumberComponents_NWP-1; aa++)
-    {
-        for ( bb=aa+1; bb<NumberComponents_NWP; bb++)
-        {
-            if (ComponentAverages_NWP(VOL,aa) < ComponentAverages_NWP(VOL,bb))
-            {
+    for (aa=0; aa<NumberComponents_NWP-1; aa++){
+        for ( bb=aa+1; bb<NumberComponents_NWP; bb++){
+            if (ComponentAverages_NWP(VOL,aa) < ComponentAverages_NWP(VOL,bb)){
                 // Exchange location of blobs aa and bb
                 //printf("Switch blob %i with %i \n", OldLabel(aa),OldLabel(bb));
                 // switch the label
@@ -3131,8 +3461,7 @@ void TwoPhase::SortBlobs()
                 OldLabel(bb) = OldLabel(aa);
                 OldLabel(aa) = TempLabel;
                 // switch the averages
-                for (idx=0; idx<BLOB_AVG_COUNT; idx++)
-                {
+                for (idx=0; idx<BLOB_AVG_COUNT; idx++){
                     TempValue = ComponentAverages_NWP(idx,bb);
                     ComponentAverages_NWP(idx,bb) = ComponentAverages_NWP(idx,aa);
                     ComponentAverages_NWP(idx,aa) = TempValue;
@@ -3141,8 +3470,7 @@ void TwoPhase::SortBlobs()
         }
     }
     IntArray NewLabel(NumberComponents_NWP);
-    for (aa=0; aa<NumberComponents_NWP; aa++)
-    {
+    for (aa=0; aa<NumberComponents_NWP; aa++){
         // Match the new label for original blob aa
         bb=0;
         while (OldLabel(bb) != aa)	bb++;
@@ -3150,14 +3478,10 @@ void TwoPhase::SortBlobs()
     }
     // Re-label the blob ID
     //	printf("Re-labeling the blobs, now indexed by volume \n");
-    for (k=0; k<Nz; k++)
-    {
-        for (j=0; j<Ny; j++)
-        {
-            for (i=0; i<Nx; i++)
-            {
-                if (Label_NWP(i,j,k) > -1)
-                {
+    for (k=0; k<Nz; k++){
+        for (j=0; j<Ny; j++){
+            for (i=0; i<Nx; i++){
+                if (Label_NWP(i,j,k) > -1){
                     TempLabel = NewLabel(Label_NWP(i,j,k));
                     Label_NWP(i,j,k) = TempLabel;
                 }
@@ -3170,12 +3494,9 @@ void TwoPhase::SortBlobs()
     OldLabel.resize(NumberComponents_WP);
     for (a=0; a<NumberComponents_WP; a++)	OldLabel(a) = a;
     // Sort the blob averages based on volume
-    for (aa=0; aa<NumberComponents_WP-1; aa++)
-    {
-        for ( bb=aa+1; bb<NumberComponents_WP; bb++)
-        {
-            if (ComponentAverages_WP(VOL,aa) < ComponentAverages_WP(VOL,bb))
-            {
+    for (aa=0; aa<NumberComponents_WP-1; aa++){
+        for ( bb=aa+1; bb<NumberComponents_WP; bb++){
+            if (ComponentAverages_WP(VOL,aa) < ComponentAverages_WP(VOL,bb)){
                 // Exchange location of blobs aa and bb
                 //printf("Switch blob %i with %i \n", OldLabel(aa),OldLabel(bb));
                 // switch the label
@@ -3183,8 +3504,7 @@ void TwoPhase::SortBlobs()
                 OldLabel(bb) = OldLabel(aa);
                 OldLabel(aa) = TempLabel;
                 // switch the averages
-                for (idx=0; idx<BLOB_AVG_COUNT; idx++)
-                {
+                for (idx=0; idx<BLOB_AVG_COUNT; idx++){
                     TempValue = ComponentAverages_WP(idx,bb);
                     ComponentAverages_WP(idx,bb) = ComponentAverages_WP(idx,aa);
                     ComponentAverages_WP(idx,aa) = TempValue;
@@ -3193,8 +3513,7 @@ void TwoPhase::SortBlobs()
         }
     }
     NewLabel.resize(NumberComponents_WP);
-    for (aa=0; aa<NumberComponents_WP; aa++)
-    {
+    for (aa=0; aa<NumberComponents_WP; aa++){
         // Match the new label for original blob aa
         bb=0;
         while (OldLabel(bb) != aa)	bb++;
@@ -3202,22 +3521,45 @@ void TwoPhase::SortBlobs()
     }
     // Re-label the blob ID
     //	printf("Re-labeling the blobs, now indexed by volume \n");
-    for (k=0; k<Nz; k++)
-    {
-        for (j=0; j<Ny; j++)
-        {
-            for (i=0; i<Nx; i++)
-            {
-                if (Label_WP(i,j,k) > -1)
-                {
+    for (k=0; k<Nz; k++){
+        for (j=0; j<Ny; j++){
+            for (i=0; i<Nx; i++){
+                if (Label_WP(i,j,k) > -1){
                     TempLabel = NewLabel(Label_WP(i,j,k));
                     Label_WP(i,j,k) = TempLabel;
                 }
             }
         }
-    }
-    //.......................................................................
-    
+    }  
+}
+
+void TwoPhase::AggregateLabels( const std::string& filename )
+{
+	
+	int nx = Dm->Nx;
+	int ny = Dm->Ny;
+	int nz = Dm->Nz;
+		
+	//printf("aggregate labels: local size=%i, global size = %i",local_size, full_size);
+	// assign the ID from the phase indicator field
+	for (int k=0; k<nz; k++){
+		for (int j=0; j<ny; j++){
+			for (int i=0; i<nx; i++){
+				int n = k*nx*ny+j*nx+i;
+				signed char local_id_val = Dm->id[n]; 
+				if (local_id_val > 0){
+					double value = TempPhase(i,j,k);
+					if (value > 0.0)	local_id_val = 1;
+					else 				local_id_val = 2;
+				}
+				 Dm->id[n] = local_id_val;
+			}
+		}
+	}
+	MPI_Barrier(Dm->Comm);
+
+	Dm->AggregateLabels( filename );
+
 }
 
 

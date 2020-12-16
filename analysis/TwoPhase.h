@@ -76,6 +76,16 @@ public:
  public:
  */
 
+class nwsMyEdge;
+class nwsMyFace;
+class nwsMyVertex;
+struct nwsMyUsedTypes : public vcg::UsedTypes< vcg::Use<nwsMyVertex>::AsVertexType, vcg::Use<nwsMyEdge>::AsEdgeType,vcg::Use<nwsMyFace>::AsFaceType>{};
+
+class nwsMyVertex:public vcg::Vertex<nwsMyUsedTypes, vcg::vertex::Coord3d, vcg::vertex::Normal3d, vcg::vertex::BitFlags, vcg::vertex::VFAdj,  vcg::vertex::CurvatureDird, vcg::vertex::Mark>{};
+class nwsMyFace:public vcg::Face< nwsMyUsedTypes, vcg::face::FFAdj, vcg::face::VFAdj, vcg::face::VertexRef,vcg::face::Normal3d, vcg::face::BitFlags, vcg::face::Mark > {};
+class nwsMyEdge:public vcg::Edge<nwsMyUsedTypes>{};
+
+class nwsMyMesh: public vcg::tri::TriMesh< std::vector<nwsMyVertex>, std::vector<nwsMyFace> , std::vector<nwsMyEdge>  > {};
 
 
 
@@ -334,7 +344,7 @@ public: // local averages (to each MPI process)
     double Kwn2_global;
     
     double Ca_global, Re_global;
-    double alpha,sphere_diameter,average_rho_input, average_mu;
+    double alpha,sphere_diameter,average_rho_input, average_mu,muA,muB;
     size_t nwBorderVert, nsBorderVert, wsBorderVert;
     size_t nwBorderFace, nsBorderFace, wsBorderFace;
     size_t nwBorderVert_global, nsBorderVert_global, wsBorderVert_global;
@@ -358,10 +368,10 @@ public: // local averages (to each MPI process)
 //    DoubleArray no_interface_vn;
     
         DoubleArray nw;
-	DoubleArray vwn;
+	DoubleArray vnw;
 	DoubleArray vws;
 	DoubleArray vns;
-	DoubleArray vwns;
+	DoubleArray vnws;
 	DoubleArray Gwn;
 	DoubleArray Gns;
 	DoubleArray Gws;
@@ -410,6 +420,10 @@ public: // sub-domain averages
     DoubleArray Eta_sub; // Interfacial speed
     double Eta;
     double Eta_global;
+
+    DoubleArray Eta_sub1; // Interfacial speed
+    double Eta1;
+    double Eta_global1;
     
 
     
@@ -426,18 +440,20 @@ public: // sub-domain averages
 	DoubleArray vws_sub;
 	DoubleArray vns_sub;
 	DoubleArray vw_sub;
-	DoubleArray vwn_sub;
-	DoubleArray vwns_sub;
+	DoubleArray vnw_sub;
+	DoubleArray vnws_sub;
 	DoubleArray Gwn_sub;
 	DoubleArray Gns_sub;
 	DoubleArray Gws_sub;
 	DoubleArray Gwns_sub;
     
+    DoubleArray an_sub1;
+    DoubleArray an_sub2;
+    DoubleArray an_sub3;
     
-    
-    double vwndnw;
-    double vwndnw_global;
-    DoubleArray vwndnw_sub;
+    double vnwdnw;
+    double vnwdnw_global;
+    DoubleArray vnwdnw_sub;
     
     DoubleArray wwn;
     DoubleArray wwn_global;
@@ -454,8 +470,16 @@ public: // sub-domain averages
     DoubleArray nwOwsO;
     DoubleArray nwOwsO_global;
     DoubleArray nwOwsO_sub;
+
+    DoubleArray nwOwsO2;
+    DoubleArray nwOwsO_global2;
+    DoubleArray nwOwsO_sub2;
    
-        DoubleArray nw_sub;
+    DoubleArray nwOnsO2;
+    DoubleArray nwOnsO_global2;
+    DoubleArray nwOnsO_sub2;
+    
+    DoubleArray nw_sub;
 
  
     vector<double> MagVel;
@@ -473,6 +497,8 @@ public: // sub-domain averages
 
 public: // Global averages (all processes)
     
+    int efawns_count;
+
     double mass_local;
     double mass_global;
     double porosity_global;
@@ -542,10 +568,10 @@ public: // Global averages (all processes)
     
         DoubleArray nw_global;
 
-	DoubleArray vwn_global;
+	DoubleArray vnw_global;
 	DoubleArray vws_global;
 	DoubleArray vns_global;
-	DoubleArray vwns_global;
+	DoubleArray vnws_global;
 	DoubleArray Gwn_global;
 	DoubleArray Gns_global;
 	DoubleArray Gws_global;
@@ -576,6 +602,7 @@ public: // Internal data
 	DoubleArray GaussCurvature;
     DoubleArray MeanCurvatureW;
     DoubleArray GaussCurvatureW;
+    DoubleArray VFPhase;
     
 	DoubleArray SDs_x;		// Gradient of the signed distance
 	DoubleArray SDs_y;
@@ -628,7 +655,9 @@ public: // Internal data
 	
     DoubleArray temp_tplus;
     DoubleArray SDw_tplus;
+    DoubleArray SDw_tplusplus;
     DoubleArray SDn_tplus;
+    DoubleArray SDn_tplusplus;
 	DoubleArray Phase_tplus;
 	DoubleArray Phase_tminus;
 	DoubleArray Vel_x;		// Velocity
@@ -641,6 +670,8 @@ public: // Internal data
 	//	Container for averages;
 	DoubleArray ComponentAverages_WP;
 	DoubleArray ComponentAverages_NWP;
+
+    DoubleArray IntegrationRegionOne;
     
     int numToAvg;
 
@@ -665,10 +696,11 @@ public: // Public interfaces
     void CuttingPlaneZ(int zval);
     
     void MeshComputations();
-    void ZeroSolidPhaseLatticeSites();
+    void ZeroSolidPhaseLatticeSites(DoubleArray &Field);
     
-    void MeanFilter();
-    void ComputePhiDistance();
+    void MeanFilter(DoubleArray &Field);
+    void InactiveCellMeanFilter(DoubleArray &Field);
+    void ComputePhiDistance(DoubleArray &Field);
     
     void FindIsolatedLatticeSites();
 
@@ -694,6 +726,8 @@ public: // Public interfaces
     void nwComputeQuantities(nwMyMesh & /* some tri mesh */);
     void nsComputeQuantities(nsMyMesh & /* some tri mesh */);
     void wsComputeQuantities(wsMyMesh & /* some tri mesh */);
+
+    void nwsComputeQuantities(nwsMyMesh & /* some tri mesh */);
     
     void nComputeQuantities(nMyMesh & /* some tri mesh */);
     void sComputeQuantities(sMyMesh & /* some tri mesh */);
@@ -710,6 +744,10 @@ public: // Public interfaces
     double Volume_n(){
         return nwp_volume_global;
     }
+
+    void CreateIntegrationBoundaryRegionOne();
+    void CreateIntegrationBoundaryRegionTwo(DoubleArray & Field);
+    void AggregateLabels( const std::string& filename );
 
 private: // Private interfaces
 	void ReduceGlobal();

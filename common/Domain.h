@@ -195,6 +195,7 @@ public: // Public variables (need to create accessors instead)
     void CommunicateMeshHalo(DoubleArray &Mesh);
     void CommInit(); 
     int PoreCount();
+    void AggregateLabels( const std::string& filename );
 
 private:
 

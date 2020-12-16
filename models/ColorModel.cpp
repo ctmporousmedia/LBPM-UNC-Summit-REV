@@ -1246,7 +1246,7 @@ void ScaLBL_ColorModel::Analyze() {
         double Kwn = Averages->Kwn_global;
         double euler = Averages->euler_global;
         double nw_phase_vol = Averages->global_nw_phase_volume;
-        double vwndnw = Averages->vwndnw_global;
+        double vwndnw = Averages->vnwdnw_global;
         double an = Averages->an_global;
         double Jwn2 = Averages->Jwn2_global;
         double Kwn2 = Averages->Kwn2_global;
@@ -1443,6 +1443,8 @@ void ScaLBL_ColorModel::Run(){
         Averages->sphere_diameter = sphere_diameter;
         Averages->average_rho_input = avgRho;
         Averages->average_mu = avgMu;
+        Averages->muA = (tauA-0.5)/3.0;
+        Averages->muB = (tauB-0.5)/3.0;
     }
     
     

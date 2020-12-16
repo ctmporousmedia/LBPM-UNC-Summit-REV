@@ -1158,7 +1158,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     char LocalRankFilename[40];
     
     string filename;
-    double Rcrit_new, SW;
+    double Rcrit_new, SW, deltaR;
     if (argc > 1){
         filename=argv[1];
         Rcrit_new=0.f;
@@ -1178,14 +1178,20 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ///// If desired, can set your own value for Rcrit to avoid the long pp run time caused by the current signed distance map
+    ///// If desired, can set your own value for Rcrit to avoid the long pp run time caused by the old signed distance map
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if (domain_db->keyExists( "Rcrit" )){
     	Rcrit_new = domain_db->getScalar<double>("Rcrit");
     }
+    if (domain_db->keyExists( "deltaR")){
+        deltaR = domain_db->getScalar<double>("deltaR");
+    } else {
+        deltaR = 0.05;
+    }
 
     if (rank == 0){
         printf("Rcrit: %f \n",Rcrit_new);
+        printf("deltaR: %f \n",deltaR);
     }
 
     if (rank == 0) { printf("\nUsing legacy pre-processor: LBPM_MORPHDRAIN_PP \n");}
@@ -1374,7 +1380,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
     double sw_diff_new = 1.0;
     
     // Increase the critical radius until the target saturation is met
-    double deltaR=0.05; // amount to change the radius in voxel units
+    //double deltaR=0.05; // amount to change the radius in voxel units
     double Rcrit_old;
     
     double GlobalNumber = 1.f;
@@ -1527,6 +1533,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
         }
 
         // Extract only the connected part of NWP
+        if (rank == 0) printf("Pre Reduction "); ////Blobs: %i \n (from ComputeBlobalBlobIDs)
         BlobIDstruct new_index;
         double vF=0.0; double vS=0.0;
         ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,vF,vS,phase_label,Dm->Comm);
@@ -1545,7 +1552,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
 
 
         //Count blobs again for degbugging
-        for (int k=0; k<nz; k++){
+        /*for (int k=0; k<nz; k++){
             for (int j=0; j<ny; j++){
                 for (int i=0; i<nx; i++){
                     n=k*nx*ny+j*nx+i;
@@ -1558,7 +1565,7 @@ void lbpm_morphdrain_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm com
             }
         }
 
-        ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,0.0,0.0,phase_label,Dm->Comm);
+        ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,0.0,0.0,phase_label,Dm->Comm);*/
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         //Number of n blobs at this point should be equal to one, can add in the "phase" for loop from above and the computeglobalblobids to check,

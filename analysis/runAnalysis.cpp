@@ -271,7 +271,7 @@ public:
 
         
         
-        ASSERT(visData[0].vars[0]->name=="phase");
+        /*ASSERT(visData[0].vars[0]->name=="phase");
         ASSERT(visData[0].vars[1]->name=="Pressure");
         ASSERT(visData[0].vars[2]->name=="Velocity_x");
         ASSERT(visData[0].vars[3]->name=="Velocity_y");
@@ -341,13 +341,23 @@ public:
         Array<double>& GradPhiZData  = visData[0].vars[19]->data;
         fillData.copy(Averages.GradPhiX,GradPhiXData);
         fillData.copy(Averages.GradPhiY,GradPhiYData);
-        fillData.copy(Averages.GradPhiZ,GradPhiZData);
+        fillData.copy(Averages.GradPhiZ,GradPhiZData);*/
        
+        ASSERT(visData[0].vars[0]->name=="phase");
+        //ASSERT(visData[0].vars[1]->name=="BlobID");
 
+        Array<double>& PhaseData = visData[0].vars[0]->data;
+        //Array<double>& BlobData  = visData[0].vars[1]->data;
 
-        
+        fillData.copy(Averages.Phase,PhaseData);
+        //fillData.copy(Averages.Label_NWP,BlobData);
         
         IO::writeData( timestep, visData, comm.comm );
+
+        char CurrentIDFilename[40];
+        sprintf(CurrentIDFilename,"id_t%d.raw",timestep);
+        Averages.AggregateLabels(CurrentIDFilename);
+
         PROFILE_STOP("Save Vis",1);
     };
 private:
@@ -373,26 +383,28 @@ public:
     virtual void run() {
         if ( matches(type,AnalysisType::ComputeAverages) ) {
             PROFILE_START("Compute dist",1);
-            Averages.Initialize();
-        
-            Averages.UpdateSolid();
-            
-            
-            Averages.ColorToSignedDistance(1.0,Averages.TempPhase,Averages.Phase);
-            Averages.ZeroSolidPhaseLatticeSites(); // Naive average works well enough
 
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            
-            Averages.ComputeDelPhi();
-            Averages.ColorToSignedDistance(-1.0,Averages.Phase,Averages.SDn);
-            Averages.ColorToSignedDistance(-1.0,Averages.Phase_tplus,Averages.SDn_tplus);
+            Averages.Initialize();
+            Averages.UpdateSolid();
+
+            Averages.ColorToSignedDistance(1.0,Averages.TempPhase,Averages.Phase);
+
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+
+            Averages.ZeroSolidPhaseLatticeSites(Averages.Phase); 
+
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+
+            Averages.ColorToSignedDistance(1.0,Averages.Phase,Averages.SDn);
+
             Averages.UpdateMeshValues();
             Averages.ComputeLocal();
-            
-
             Averages.Reduce();
             Averages.PrintAll(timestep);
 
@@ -428,24 +440,27 @@ public:
         Averages.Label_WP.fill(0.0);
         if ( matches(type,AnalysisType::ComputeAverages) ) {
             PROFILE_START("Compute comp",1);
+
             Averages.Initialize();
-        
             Averages.UpdateSolid();
-            
-            
+
             Averages.ColorToSignedDistance(1.0,Averages.TempPhase,Averages.Phase);
-            Averages.ZeroSolidPhaseLatticeSites(); // Naive average works well enough
 
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            Averages.MeanFilter();
-            
-            Averages.ComputeDelPhi();
-            Averages.ColorToSignedDistance(-1.0,Averages.Phase,Averages.SDn);
-            Averages.ColorToSignedDistance(-1.0,Averages.Phase_tplus,Averages.SDn_tplus);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+            Averages.InactiveCellMeanFilter(Averages.Phase);
+
+            Averages.ZeroSolidPhaseLatticeSites(Averages.Phase); 
+
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+            Averages.MeanFilter(Averages.Phase);
+
+            Averages.ColorToSignedDistance(1.0,Averages.Phase,Averages.SDn);
+
             Averages.UpdateMeshValues();
-
             Averages.ComponentAverages();
             Averages.SortBlobs();
             Averages.PrintComponents(timestep);
@@ -558,56 +573,52 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
     Point P,A,B,C;
 
     auto PhaseVar = std::make_shared<IO::Variable>();
-    auto PressVar = std::make_shared<IO::Variable>();
-    auto VxVar = std::make_shared<IO::Variable>();
-    auto VyVar = std::make_shared<IO::Variable>();
-    auto VzVar = std::make_shared<IO::Variable>();
-    auto SignDistVar = std::make_shared<IO::Variable>();
-    
+    //auto PressVar = std::make_shared<IO::Variable>();
+    //auto VxVar = std::make_shared<IO::Variable>();
+    //auto VyVar = std::make_shared<IO::Variable>();
+    //auto VzVar = std::make_shared<IO::Variable>();
+    //auto SignDistVar = std::make_shared<IO::Variable>();
     
     auto BlobIDVar = std::make_shared<IO::Variable>();
+
 //        auto SDnVar = std::make_shared<IO::Variable>();
-    auto SDwVar = std::make_shared<IO::Variable>();
-    
-    auto BCVar = std::make_shared<IO::Variable>();
-    auto AVar = std::make_shared<IO::Variable>();
-    auto DVar = std::make_shared<IO::Variable>();
-    auto QVar = std::make_shared<IO::Variable>();
+
+    //auto SDwVar = std::make_shared<IO::Variable>();
+    //auto BCVar = std::make_shared<IO::Variable>();
+    //auto AVar = std::make_shared<IO::Variable>();
+    //auto DVar = std::make_shared<IO::Variable>();
+    //auto QVar = std::make_shared<IO::Variable>();
+
 //        auto LVar = std::make_shared<IO::Variable>();
 //        auto SVFVar = std::make_shared<IO::Variable>();
     
-    auto MTDenVar = std::make_shared<IO::Variable>();
-    auto MTDenVar2 = std::make_shared<IO::Variable>();
-    
-   
+    //auto MTDenVar = std::make_shared<IO::Variable>();
+    //auto MTDenVar2 = std::make_shared<IO::Variable>();
     
 //        auto MTMassVar = std::make_shared<IO::Variable>();
 //        auto MTMassVar2 = std::make_shared<IO::Variable>();
 //
-    auto BCVar2 = std::make_shared<IO::Variable>();
-    auto AVar2 = std::make_shared<IO::Variable>();
-    auto DVar2 = std::make_shared<IO::Variable>();
-    auto QVar2 = std::make_shared<IO::Variable>();
+    //auto BCVar2 = std::make_shared<IO::Variable>();
+    //auto AVar2 = std::make_shared<IO::Variable>();
+    //auto DVar2 = std::make_shared<IO::Variable>();
+    //auto QVar2 = std::make_shared<IO::Variable>();
     
-    auto GradPhiXVar = std::make_shared<IO::Variable>();
-    auto GradPhiYVar = std::make_shared<IO::Variable>();
-    auto GradPhiZVar = std::make_shared<IO::Variable>();
-    
-
-
+    //auto GradPhiXVar = std::make_shared<IO::Variable>();
+    //auto GradPhiYVar = std::make_shared<IO::Variable>();
+    //auto GradPhiZVar = std::make_shared<IO::Variable>();
     
     PhaseVar->name = "phase";
     PhaseVar->type = IO::VariableType::VolumeVariable;
     PhaseVar->dim = 1;
     PhaseVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
     d_meshData[0].vars.push_back(PhaseVar);
-    PressVar->name = "Pressure";
+    /*PressVar->name = "Pressure";
     PressVar->type = IO::VariableType::VolumeVariable;
     PressVar->dim = 1;
     PressVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(PressVar);
+    d_meshData[0].vars.push_back(PressVar);*/
     
-    VxVar->name = "Velocity_x";
+    /*VxVar->name = "Velocity_x";
     VxVar->type = IO::VariableType::VolumeVariable;
     VxVar->dim = 1;
     VxVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
@@ -621,13 +632,13 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
     VzVar->type = IO::VariableType::VolumeVariable;
     VzVar->dim = 1;
     VzVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(VzVar);
+    d_meshData[0].vars.push_back(VzVar);*/
     
-    SignDistVar->name = "SignDist";
+    /*SignDistVar->name = "SignDist";
     SignDistVar->type = IO::VariableType::VolumeVariable;
     SignDistVar->dim = 1;
     SignDistVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(SignDistVar);
+    d_meshData[0].vars.push_back(SignDistVar);*/
     
     //MTDenVar->name = "DelPhi";
     //MTDenVar->name = "BlobID";
@@ -635,87 +646,73 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
     //MTDenVar->dim = 1;
     //MTDenVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
     //d_meshData[0].vars.push_back(MTDenVar);
-    BlobIDVar->name = "BlobID";
-    BlobIDVar->type = IO::VariableType::VolumeVariable;
-    BlobIDVar->dim = 1;
-    BlobIDVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(BlobIDVar);
-    MTDenVar2->name = "DensityB";
-    MTDenVar2->type = IO::VariableType::VolumeVariable;
-    MTDenVar2->dim = 1;
-    MTDenVar2->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-    d_meshData[0].vars.push_back(MTDenVar2);
-    
-    
+
     //BlobIDVar->name = "BlobID";
     //BlobIDVar->type = IO::VariableType::VolumeVariable;
     //BlobIDVar->dim = 1;
     //BlobIDVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
     //d_meshData[0].vars.push_back(BlobIDVar);
+
+    /*MTDenVar2->name = "DensityB";
+    MTDenVar2->type = IO::VariableType::VolumeVariable;
+    MTDenVar2->dim = 1;
+    MTDenVar2->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    d_meshData[0].vars.push_back(MTDenVar2);*/
+
 //        SDnVar->name = "SDnID";
 //        SDnVar->type = IO::VariableType::VolumeVariable;
 //        SDnVar->dim = 1;
 //        SDnVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
 //        d_meshData[0].vars.push_back(SDnVar);
     
-    
-        SDwVar->name = "ID";
+        /*SDwVar->name = "ID";
         SDwVar->type = IO::VariableType::VolumeVariable;
         SDwVar->dim = 1;
         SDwVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(SDwVar);
+        d_meshData[0].vars.push_back(SDwVar);*/
     
-    
-        BCVar->name = "BC_odd";
+        /*BCVar->name = "BC_odd";
         BCVar->type = IO::VariableType::VolumeVariable;
         BCVar->dim = 1;
         BCVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(BCVar);
-        AVar->name = "A_odd";
+        d_meshData[0].vars.push_back(BCVar);*/
+
+        /*AVar->name = "A_odd";
         AVar->type = IO::VariableType::VolumeVariable;
         AVar->dim = 1;
         AVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(AVar);
-        DVar->name = "D_odd";
+        d_meshData[0].vars.push_back(AVar);*/
+
+        /*DVar->name = "D_odd";
         DVar->type = IO::VariableType::VolumeVariable;
         DVar->dim = 1;
         DVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(DVar);
-        QVar->name = "Q_odd";
+        d_meshData[0].vars.push_back(DVar);*/
+
+        /*QVar->name = "Q_odd";
         QVar->type = IO::VariableType::VolumeVariable;
         QVar->dim = 1;
         QVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(QVar);
-    
-    
-    
-    
-    
-    
-    
+        d_meshData[0].vars.push_back(QVar);*/
+ 
 //        LVar->name = "L";
 //        LVar->type = IO::VariableType::VolumeVariable;
 //        LVar->dim = 1;
 //        LVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
 //        d_meshData[0].vars.push_back(LVar);
+
 //        SVFVar->name = "SolidVolumeFraction";
 //        SVFVar->type = IO::VariableType::VolumeVariable;
 //        SVFVar->dim = 1;
 //        SVFVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
 //        d_meshData[0].vars.push_back(SVFVar);
     
-    
-    
-    
-   
-    
-    
-    
 //        MTMassVar->name = "MTMassA";
 //        MTMassVar->type = IO::VariableType::VolumeVariable;
 //        MTMassVar->dim = 1;
 //        MTMassVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
 //        d_meshData[0].vars.push_back(MTMassVar);
+
 //        MTMassVar2->name = "MTMassB";
 //        MTMassVar2->type = IO::VariableType::VolumeVariable;
 //        MTMassVar2->dim = 1;
@@ -723,7 +720,7 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
 //        d_meshData[0].vars.push_back(MTMassVar2);
     
     
-        BCVar2->name = "BC_even";
+        /*BCVar2->name = "BC_even";
         BCVar2->type = IO::VariableType::VolumeVariable;
         BCVar2->dim = 1;
         BCVar2->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
@@ -742,10 +739,10 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
         QVar2->type = IO::VariableType::VolumeVariable;
         QVar2->dim = 1;
         QVar2->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(QVar2);
+        d_meshData[0].vars.push_back(QVar2);*/
     
     
-        GradPhiXVar->name = "GradPhiX";
+        /*GradPhiXVar->name = "GradPhiX";
         GradPhiXVar->type = IO::VariableType::VolumeVariable;
         GradPhiXVar->dim = 1;
         GradPhiXVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
@@ -759,7 +756,7 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
         GradPhiZVar->type = IO::VariableType::VolumeVariable;
         GradPhiZVar->dim = 1;
         GradPhiZVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-        d_meshData[0].vars.push_back(GradPhiZVar);
+        d_meshData[0].vars.push_back(GradPhiZVar);*/
 
     
     
@@ -881,8 +878,14 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
         // Copy the averages to the CPU (and identify blobs)
         //printf("Copy sim state, timestep=%i \n",timestep);
         type |= AnalysisType::CopySimState;
-        type |= AnalysisType::IdentifyBlobs;
+        //type |= AnalysisType::IdentifyBlobs;
     }
+    if ( timestep%d_component_interval + 1 == d_component_interval ) {
+        // Copy the averages to the CPU (and identify blobs)
+        //printf("Copy sim state, timestep=%i \n",timestep);
+        type |= AnalysisType::CopySimState;
+        type |= AnalysisType::IdentifyBlobs;
+    }    
     if ( timestep%d_analysis_interval == 0 ) {
         // Run the analysis
         //printf("Compute averages, timestep=%i \n",timestep);
@@ -1012,20 +1015,27 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     // Spawn threads to do blob identification work
     if ( matches(type,AnalysisType::IdentifyBlobs) ) {
         if ( d_rank == 0 )  { printf("IdentifyBlobs being called at timestep %i \n",timestep);  }
+
                 phase = std::shared_ptr<DoubleArray>(new DoubleArray(d_N[0],d_N[1],d_N[2]));
         
                 ScaLBL_CopyToHost(phase->data(),Phi,N*sizeof(double));
                 Averages.Dm->CommunicateMeshHalo(*phase);
-         
-                Averages.ZeroSolidPhaseLatticeSites(); // Naive average works well enough
 
-                Averages.MeanFilter();
-                Averages.MeanFilter();
-                Averages.MeanFilter();
-                Averages.MeanFilter();
-                
-                Averages.ColorToSignedDistance(-1.0,Averages.Phase,Averages.SDn);
-                Averages.Dm->CommunicateMeshHalo(Averages.SDn);
+                Averages.InactiveCellMeanFilter(*phase);
+                Averages.InactiveCellMeanFilter(*phase);
+                Averages.InactiveCellMeanFilter(*phase);
+                Averages.InactiveCellMeanFilter(*phase);
+
+                Averages.ZeroSolidPhaseLatticeSites(*phase);
+
+                Averages.MeanFilter(*phase);
+                Averages.MeanFilter(*phase);
+                Averages.MeanFilter(*phase);
+                Averages.MeanFilter(*phase);
+
+                Averages.ColorToSignedDistance(1.0,*phase,Averages.SDn);
+
+                Averages.UpdateMeshValues();
 
                 BlobIDstruct new_index(new std::pair<int,IntArray>(0,IntArray()));
                 BlobIDstruct new_ids(new std::pair<int,IntArray>(0,IntArray()));
@@ -1040,16 +1050,16 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
                 d_last_index = new_index;
                 d_last_ids = new_ids;
                 d_last_id_map = new_list;
+                
     }
     
     // Spawn threads to do the analysis work
 
     if ( timestep%d_analysis_interval == 0 ) {
         auto work = new AnalysisWorkItem(type,timestep,Averages,d_last_index,d_last_id_map,d_beta);
-        //auto work = new AnalysisWorkItem(type,timestep,Averages,d_beta);
-        work->add_dependency(d_wait_blobID);
+        //work->add_dependency(d_wait_blobID);
         work->add_dependency(d_wait_analysis);
-        work->add_dependency(d_wait_vis);     // Make sure we are done using analysis before modifying
+        work->add_dependency(d_wait_vis);          // Make sure we are done using analysis before modifying
         d_wait_analysis = d_tpool.add_work(work);
     }
 
@@ -1084,7 +1094,6 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     }
     
     // Save the results for visualization
-    //    if ( matches(type,AnalysisType::CreateRestart) ) {
     if (timestep%d_visualization_interval==0){
         // Write the vis files
         auto work = new WriteVisWorkItem( timestep, d_meshData, Averages, d_fillData, getComm() );

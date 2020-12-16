@@ -457,7 +457,8 @@ int ComputeGlobalBlobIDs( int nx, int ny, int nz, const RankInfoStruct& rank_inf
     int nblobs = ComputeLocalBlobIDs(Phase,SignDist,vF,vS,GlobalBlobID,false);
     // Compute the global ids
     int nglobal = LocalToGlobalIDs( nx, ny, nz, rank_info, nblobs, GlobalBlobID, comm );
-    printf("Blobs: %i \n",nglobal);
+    const int rank = rank_info.rank[1][1][1];
+    if (rank == 0) printf("Blobs: %i \n",nglobal);
     PROFILE_STOP("ComputeGlobalBlobIDs");
     return nglobal;
 }
