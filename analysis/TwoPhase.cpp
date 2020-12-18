@@ -2130,6 +2130,7 @@ void TwoPhase::ComputeLocal()
                     if ( phase_val > 0 ) {
                         nwp_volume_sub(i2,j2,k2) += 1.0;
                         an_sub(i2,j2,k2) += 1.0;
+                        porosity_sub(i2,j2,k2) += 1.0;
                         // velocity
                         vn_sub(i2,j2,k2,0) += Vel_x(n);
                         vn_sub(i2,j2,k2,1) += Vel_y(n);
@@ -2142,6 +2143,7 @@ void TwoPhase::ComputeLocal()
                     else {
                         wp_volume_sub(i2,j2,k2) += 1.0;
                         aw_sub(i2,j2,k2) += 1.0;
+                        porosity_sub(i2,j2,k2) += 1.0;
                         // velocity
                         vw_sub(i2,j2,k2,0) += Vel_x(n);
                         vw_sub(i2,j2,k2,1) += Vel_y(n);
@@ -2158,6 +2160,7 @@ void TwoPhase::ComputeLocal()
                         if ( phase_val > 0 ) {
                             nwp_volume_sub(i2,j2,k2) += vf;
                             an_sub(i2,j2,k2) += vf;
+                            porosity_sub(i2,j2,k2) += vf;
                             if (delPhi_val < 1e-4) {
                                 vol_n_sub(i2,j2,k2) += vf;
                             }
@@ -2165,6 +2168,7 @@ void TwoPhase::ComputeLocal()
                         else {
                             wp_volume_sub(i2,j2,k2) += vf;
                             aw_sub(i2,j2,k2) += vf;
+                            porosity_sub(i2,j2,k2) += vf;
                             if (delPhi_val < 1e-4) {
                                 vol_w_sub(i2,j2,k2) += vf;
                             }
@@ -2174,6 +2178,7 @@ void TwoPhase::ComputeLocal()
                         if ( phase_val > 0 ) {
                             nwp_volume_sub(i2,j2,k2) += vf;
                             an_sub(i2,j2,k2) += vf;
+                            porosity_sub(i2,j2,k2) += vf;
                             // velocity
                             vn_sub(i2,j2,k2,0) += Vel_x(n);
                             vn_sub(i2,j2,k2,1) += Vel_y(n);
@@ -2186,6 +2191,7 @@ void TwoPhase::ComputeLocal()
                         else {
                             wp_volume_sub(i2,j2,k2) += vf;
                             aw_sub(i2,j2,k2) += vf;
+                            porosity_sub(i2,j2,k2) += vf;
                             // velocity
                             vw_sub(i2,j2,k2,0) += Vel_x(n);
                             vw_sub(i2,j2,k2,1) += Vel_y(n);
@@ -2198,7 +2204,7 @@ void TwoPhase::ComputeLocal()
                     }
                 } 
 
-                if (vs > 0.0)  porosity_sub(i2,j2,k2) += vs;
+                //if (vs > 0.0)  porosity_sub(i2,j2,k2) += vs;
                 
                 //...........................................................................
                 n_nw_pts=n_ns_pts=n_ws_pts=n_nws_pts=n_local_sol_pts=n_local_nws_pts=0;
@@ -2283,7 +2289,6 @@ void TwoPhase::ComputeLocal()
     an = an_sub.sum();
     aw = aw_sub.sum();
     pn = pn_sub.sum();
-    //printf("pn here0: %f \n",pn);
     pw = pw_sub.sum();
     pwn = pwn_sub.sum();
     lwns = lwns_sub.sum();
@@ -2896,10 +2901,8 @@ void TwoPhase::ReduceGlobal()
     MPI_Allreduce(&pw,&pw_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     MPI_Allreduce(&pwn,&pwn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
     
-    //printf("pn here1: %f \n",pn);
     MPI_Allreduce(&pn,&pn_global,1,MPI_DOUBLE,MPI_SUM,Dm->Comm);
 
-    //printf("pn here2: %f \n",pn_global);
 
     if (vol_n_global > 0) {
         pn_global /= vol_n_global;
@@ -2907,9 +2910,6 @@ void TwoPhase::ReduceGlobal()
     else {
         pn_global = 0.0;
     }
-
-    //printf("vol_n_global here3: %f \n",vol_n_global);
-    //printf("pn here3: %f \n",pn_global);
 
     if (vol_w_global > 0) {
         pw_global /= vol_w_global;
@@ -3065,8 +3065,6 @@ void TwoPhase::PrintAll(int timestep)
         double sat_w = 1.0 - nwp_volume_global/(nwp_volume_global+wp_volume_global);
         // double poros = porosity_global;
         // efawns_global = std::acos(efawns_global)*180/PI;
-        
-        //printf("pn here4: %f \n",pn_global);
 
         nw_global(0) = nw_global(1) = nw_global(2) = 0;
         // "time porosity s^w p^w* p^n* eps^{wn}* eps^{ns}* eps^{ws}* J_n^{wn}* K_n^{wn}* l^{wns}* c^{wns} kappa_N^{wns}* kappa_G^{wns}* "
