@@ -3314,7 +3314,7 @@ void TwoPhase::PrintAll(int timestep)
 void TwoPhase::PrintComponents(int timestep)
 {
     if (Dm->rank()==0){
-        printf("PRINT %i COMPONENT AVERAGES: time = %i \n",(int)ComponentAverages_NWP.size(1),timestep);
+        printf("Print %i nonwetting component averages at timestep %i \n",(int)ComponentAverages_NWP.size(1),timestep);
         for (int b=0; b<NumberComponents_NWP; b++){
             //if (ComponentAverages_NWP(TRIMVOL,b) > 0.0){
             fprintf(NWPLOG,"%i ",timestep);
@@ -3533,12 +3533,10 @@ void TwoPhase::SortBlobs()
 
 void TwoPhase::AggregateLabels( const std::string& filename )
 {
-	
 	int nx = Dm->Nx;
 	int ny = Dm->Ny;
 	int nz = Dm->Nz;
 		
-	//printf("aggregate labels: local size=%i, global size = %i",local_size, full_size);
 	// assign the ID from the phase indicator field
 	for (int k=0; k<nz; k++){
 		for (int j=0; j<ny; j++){

@@ -196,6 +196,7 @@ public: // Public variables (need to create accessors instead)
     void CommInit(); 
     int PoreCount();
     void AggregateLabels( const std::string& filename );
+    void Decomp( const std::string& Filename, std::shared_ptr<Database> db );
 
 private:
 

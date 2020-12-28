@@ -118,7 +118,7 @@ public:
     phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))*/
     BlobIdentificationWorkItem1( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
             const DoubleArray& SDN_, const DoubleArray& dist_,
-            BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_, runAnalysis::commWrapper&& comm_ ):
+            BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_, runAnalysis::commWrapper&& comm_):
                 timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
                 SDN(SDN_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
     {
@@ -156,7 +156,7 @@ public:
     phase(phase_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))*/
     BlobIdentificationWorkItem2( int timestep_, int Nx_, int Ny_, int Nz_, const RankInfoStruct& rank_info_,
                                 const DoubleArray& SDN_, const DoubleArray& dist_,
-                                BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_ , runAnalysis::commWrapper&& comm_ ):
+                                BlobIDstruct last_id_, BlobIDstruct new_index_, BlobIDstruct new_id_, BlobIDList new_list_ , runAnalysis::commWrapper&& comm_):
     timestep(timestep_), Nx(Nx_), Ny(Ny_), Nz(Nz_), rank_info(rank_info_),
     SDN(SDN_), dist(dist_), last_id(last_id_), new_index(new_index_), new_id(new_id_), new_list(new_list_), comm(std::move(comm_))
     {
@@ -345,15 +345,22 @@ public:
        
         ASSERT(visData[0].vars[0]->name=="phase");
         //ASSERT(visData[0].vars[1]->name=="BlobID");
+        //ASSERT(visData[0].vars[1]->name=="SDnID");
+        //ASSERT(visData[0].vars[2]->name=="tempphase");
 
         Array<double>& PhaseData = visData[0].vars[0]->data;
         //Array<double>& BlobData  = visData[0].vars[1]->data;
-
+        //Array<double>& SDnData  = visData[0].vars[1]->data;
+        //Array<double>& TempPhaseData = visData[0].vars[2]->data;
+        
         fillData.copy(Averages.Phase,PhaseData);
         //fillData.copy(Averages.Label_NWP,BlobData);
+        //fillData.copy(Averages.SDn,SDnData);
+        //fillData.copy(Averages.TempPhase,TempPhaseData);
         
         IO::writeData( timestep, visData, comm.comm );
 
+        printf("Printing Raw File \n");
         char CurrentIDFilename[40];
         sprintf(CurrentIDFilename,"id_t%d.raw",timestep);
         Averages.AggregateLabels(CurrentIDFilename);
@@ -579,10 +586,10 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
     //auto VzVar = std::make_shared<IO::Variable>();
     //auto SignDistVar = std::make_shared<IO::Variable>();
     
-    auto BlobIDVar = std::make_shared<IO::Variable>();
+    //auto BlobIDVar = std::make_shared<IO::Variable>();
 
-//        auto SDnVar = std::make_shared<IO::Variable>();
-
+    //auto SDnVar = std::make_shared<IO::Variable>();
+    //auto TempPhaseVar = std::make_shared<IO::Variable>();
     //auto SDwVar = std::make_shared<IO::Variable>();
     //auto BCVar = std::make_shared<IO::Variable>();
     //auto AVar = std::make_shared<IO::Variable>();
@@ -659,11 +666,17 @@ runAnalysis::runAnalysis( std::shared_ptr<Database> db,
     MTDenVar2->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
     d_meshData[0].vars.push_back(MTDenVar2);*/
 
-//        SDnVar->name = "SDnID";
-//        SDnVar->type = IO::VariableType::VolumeVariable;
-//        SDnVar->dim = 1;
-//        SDnVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
-//        d_meshData[0].vars.push_back(SDnVar);
+    /*SDnVar->name = "SDnID";
+    SDnVar->type = IO::VariableType::VolumeVariable;
+    SDnVar->dim = 1;
+    SDnVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    d_meshData[0].vars.push_back(SDnVar);
+
+    TempPhaseVar->name = "tempphase";
+    TempPhaseVar->type = IO::VariableType::VolumeVariable;
+    TempPhaseVar->dim = 1;
+    TempPhaseVar->data.resize(Dm->Nx-2,Dm->Ny-2,Dm->Nz-2);
+    d_meshData[0].vars.push_back(TempPhaseVar);*/
     
         /*SDwVar->name = "ID";
         SDwVar->type = IO::VariableType::VolumeVariable;
@@ -857,15 +870,31 @@ void runAnalysis::createThreads( const std::string& method, int N_threads )
 AnalysisType runAnalysis::computeAnalysisType( int timestep )
 {
     AnalysisType type = AnalysisType::AnalyzeNone;
+
     if ( timestep%d_analysis_interval + 2 == d_analysis_interval ) {
         // Copy the phase indicator field for the earlier timestep
-        // printf("Copy phase indicator,timestep=%i\n",timestep);
         type |= AnalysisType::CopyPhaseIndicator;
     }
-    if ( timestep%d_blobid_interval == 0 ) {
+
+    if ( timestep%d_component_interval + 1 == d_component_interval ) {
+        // Copy the averages to the CPU and identify blobs
+        type |= AnalysisType::CopySimState;
+        type |= AnalysisType::IdentifyBlobs;
+    }
+
+    if (timestep%d_component_interval == 0) {
+        type |= AnalysisType::ComputeComponents;
+    }
+
+    if ( timestep%d_blobid_interval == 0 && timestep%d_component_interval == 0) {
+    } else if (timestep%d_blobid_interval == 0){
+        type |= AnalysisType::IdentifyBlobs;
+    }
+    
+    //if ( timestep%d_blobid_interval == 0 ) {
     // Identify blobs and update global ids in time
-       type |= AnalysisType::IdentifyBlobs;
-        }
+      // type |= AnalysisType::IdentifyBlobs;
+    //}
     /*#ifdef USE_CUDA
      if ( tpool.getQueueSize()<=3 && tpool.getNumThreads()>0 && timestep%50==0 ) {
      // Keep a few blob identifications queued up to keep the processors busy,
@@ -876,24 +905,22 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
      #endif */
     if ( timestep%d_analysis_interval + 1 == d_analysis_interval ) {
         // Copy the averages to the CPU (and identify blobs)
-        //printf("Copy sim state, timestep=%i \n",timestep);
         type |= AnalysisType::CopySimState;
-        //type |= AnalysisType::IdentifyBlobs;
     }
-    if ( timestep%d_component_interval + 1 == d_component_interval ) {
+    //if ( timestep%d_component_interval + 1 == d_component_interval ) {
         // Copy the averages to the CPU (and identify blobs)
         //printf("Copy sim state, timestep=%i \n",timestep);
-        type |= AnalysisType::CopySimState;
-        type |= AnalysisType::IdentifyBlobs;
-    }    
+    //    type |= AnalysisType::CopySimState;
+    //    type |= AnalysisType::IdentifyBlobs;
+    //}    
     if ( timestep%d_analysis_interval == 0 ) {
         // Run the analysis
         //printf("Compute averages, timestep=%i \n",timestep);
         type |= AnalysisType::ComputeAverages;
     }
-    if ( timestep%d_component_interval == 0) {
-        type |= AnalysisType::ComputeComponents;
-    }
+    //if ( timestep%d_component_interval == 0) {
+    //    type |= AnalysisType::ComputeComponents;
+    //}
     if (timestep%d_restart_interval == 0) {
         // Write the restart file
         type |= AnalysisType::CreateRestart;
@@ -902,7 +929,7 @@ AnalysisType runAnalysis::computeAnalysisType( int timestep )
         // Write the visualization data
         type |= AnalysisType::WriteVis;
         type |= AnalysisType::CopySimState;
-        type |= AnalysisType::IdentifyBlobs;
+        //type |= AnalysisType::IdentifyBlobs;
     }
     return type;
 }
@@ -930,7 +957,7 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
                        int Np, double Fx, double Fy, double Fz)
 {
     int N = d_N[0]*d_N[1]*d_N[2];
-    
+
     // Check which analysis steps we need to perform
     auto type = computeAnalysisType( timestep );
     if ( type == AnalysisType::AnalyzeNone )
@@ -1097,7 +1124,7 @@ void runAnalysis::run4( int timestep, TwoPhase& Averages,
     if (timestep%d_visualization_interval==0){
         // Write the vis files
         auto work = new WriteVisWorkItem( timestep, d_meshData, Averages, d_fillData, getComm() );
-        work->add_dependency(d_wait_blobID);
+        //work->add_dependency(d_wait_blobID);
         work->add_dependency(d_wait_analysis);
         work->add_dependency(d_wait_vis);
         d_wait_vis = d_tpool.add_work(work);
