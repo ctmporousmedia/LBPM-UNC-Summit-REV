@@ -360,7 +360,6 @@ public:
         
         IO::writeData( timestep, visData, comm.comm );
 
-        printf("Printing Raw File \n");
         char CurrentIDFilename[40];
         sprintf(CurrentIDFilename,"id_t%d.raw",timestep);
         Averages.AggregateLabels(CurrentIDFilename);

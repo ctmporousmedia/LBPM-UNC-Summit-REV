@@ -857,14 +857,20 @@ void Domain::AggregateLabels( const std::string& filename ){
 	int full_nz = npz*(nz-2);
 	int local_size = (nx-2)*(ny-2)*(nz-2);
 	long int full_size = long(full_nx)*long(full_ny)*long(full_nz);
+
+	int rnk, tag;
+	int i, j, k;
+	int x, y, z;
+	int n_local; 
+	long int n_full;
 	
 	signed char *LocalID;
 	LocalID = new signed char [local_size];
 		
 	// assign the ID for the local sub-region
-	for (int k=1; k<nz-1; k++){
-		for (int j=1; j<ny-1; j++){
-			for (int i=1; i<nx-1; i++){
+	for (k=1; k<nz-1; k++){
+		for (j=1; j<ny-1; j++){
+			for (i=1; i<nx-1; i++){
 				int n = k*nx*ny+j*nx+i;
 				signed char local_id_val = id[n]; 
 				LocalID[(k-1)*(nx-2)*(ny-2) + (j-1)*(nx-2) + i-1] = local_id_val;
@@ -878,34 +884,37 @@ void Domain::AggregateLabels( const std::string& filename ){
 		signed char *FullID;
 		FullID = new signed char [full_size];
 		// first handle local ID for rank 0
-		for (int k=1; k<nz-1; k++){
-			for (int j=1; j<ny-1; j++){
-				for (int i=1; i<nx-1; i++){
-					int x = i-1;
-					int y = j-1;
-					int z = k-1;
-					int n_local = (k-1)*(nx-2)*(ny-2) + (j-1)*(nx-2) + i-1;
-					int n_full = z*full_nx*full_ny + y*full_nx + x;
+		for (k=1; k<nz-1; k++){
+			for (j=1; j<ny-1; j++){
+				for (i=1; i<nx-1; i++){
+					x = i-1;
+					y = j-1;
+					z = k-1;
+					n_local = (k-1)*(nx-2)*(ny-2) + (j-1)*(nx-2) + i-1;
+					n_full = long(z)*long(full_nx)*long(full_ny) + long(y)*long(full_nx) + long(x);
 					FullID[n_full] = LocalID[n_local];
 				}
 			}
 		}
 		// next get the local ID from the other ranks
-		for (int rnk = 1; rnk<nprocs; rnk++){
+		for (rnk = 1; rnk<nprocs; rnk++){
 			ipz = rnk / (npx*npy);
 			ipy = (rnk - ipz*npx*npy) / npx;
 			ipx = (rnk - ipz*npx*npy - ipy*npx); 
 			//printf("ipx=%i ipy=%i ipz=%i\n", ipx, ipy, ipz);
-			int tag = 15+rnk;
+			tag = 15+rnk;
 			MPI_Recv(LocalID,local_size,MPI_CHAR,rnk,tag,Comm,MPI_STATUS_IGNORE);
-			for (int k=1; k<nz-1; k++){
-				for (int j=1; j<ny-1; j++){
-					for (int i=1; i<nx-1; i++){
-						int x = i-1 + ipx*(nx-2);
-						int y = j-1 + ipy*(ny-2);
-						int z = k-1 + ipz*(nz-2);
-						int n_local = (k-1)*(nx-2)*(ny-2) + (j-1)*(nx-2) + i-1;
-						int n_full = z*full_nx*full_ny + y*full_nx + x;
+			for (k=1; k<nz-1; k++){
+				for (j=1; j<ny-1; j++){
+					for (i=1; i<nx-1; i++){
+						//if (rnk == 256) printf("i j k: %i %i %i \n", i, j, k);
+						x = i-1 + ipx*(nx-2);
+						y = j-1 + ipy*(ny-2);
+						z = k-1 + ipz*(nz-2);
+						//if (rnk == 256) printf("x y z: %i %i %i \n", x, y, z);
+						n_local = (k-1)*(nx-2)*(ny-2) + (j-1)*(nx-2) + i-1;
+						n_full = long(z)*long(full_nx)*long(full_ny) + long(y)*long(full_nx) + long(x);
+						if (rnk == 256 && n_local == 0) printf("nlocal, nfull: %i %i \n", n_local,n_full);
 						FullID[n_full] = LocalID[n_local];
 					}
 				}
@@ -918,12 +927,11 @@ void Domain::AggregateLabels( const std::string& filename ){
 	}
 	else{
 		// send LocalID to rank=0
-		int tag = 15+ rank();
+		tag = 15+ rank();
 		int dstrank = 0;
 		MPI_Send(LocalID,local_size,MPI_CHAR,dstrank,tag,Comm);
 	}
 	MPI_Barrier(Comm);
-
 }
 
 void Domain::Decomp( const std::string& Filename, std::shared_ptr<Database> db )
