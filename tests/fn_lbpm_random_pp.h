@@ -1697,6 +1697,7 @@ void lbpm_morphimb_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm)
     //.......................................................................
     // Reading the domain information file
     //.......................................................................
+    if (rank == 0) cout << "========================================\nMORPHOLOGICAL IMBIBITION PRE-PROCESSOR\n========================================\n";
     int n, nx, ny, nz;
     char LocalRankFilename[40];
 
@@ -1727,7 +1728,7 @@ void lbpm_morphimb_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm)
     ny = size[1];
     nz = size[2];
 
-    int N = (nx+2)*(ny+2)*(nz+2);
+    size_t N = (nx+2)*(ny+2)*(nz+2);
 
     std::shared_ptr<Domain> Dm (new Domain(domain_db,comm));
     std::shared_ptr<Domain> Mask (new Domain(domain_db,comm));
@@ -1795,6 +1796,7 @@ void lbpm_morphimb_pp(int argc, char **argv,int rank, int nprocs, MPI_Comm comm)
     // Extract only the connected part of NWP
     BlobIDstruct new_index;
     double vF=0.0; double vS=0.0;
+    if (rank == 0) printf("Blob count pre morph imb: ");
     ComputeGlobalBlobIDs(nx-2,ny-2,nz-2,Dm->rank_info,phase,SignDist,vF,vS,phase_label,Dm->Comm);
     MPI_Barrier(Dm->Comm);
         

@@ -3541,7 +3541,7 @@ void TwoPhase::AggregateLabels( const std::string& filename )
 	for (int k=0; k<nz; k++){
 		for (int j=0; j<ny; j++){
 			for (int i=0; i<nx; i++){
-				int n = k*nx*ny+j*nx+i;
+				size_t n = k*nx*ny+j*nx+i;
 				signed char local_id_val = Dm->id[n]; 
 				if (local_id_val > 0){
 					double value = TempPhase(i,j,k);
